@@ -160,7 +160,7 @@ public class Drawgates {
     g.drawPolyline(xPoints, yPoints, 3);
   }
 
-  static void paintPortNames(
+  public static void paintPortNames(
       InstancePainter painter, int x, int y, int height, String[] portNames) {
     final var gfx = painter.getGraphics();
     final var portsPerRow = portNames.length / 2;
