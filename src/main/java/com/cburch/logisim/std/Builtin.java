@@ -15,6 +15,7 @@ import com.cburch.logisim.soc.Soc;
 import com.cburch.logisim.std.arith.ArithmeticLibrary;
 import com.cburch.logisim.std.base.BaseLibrary;
 import com.cburch.logisim.std.bfh.BfhLibrary;
+import com.cburch.logisim.std.classic.ClassicLibrary;
 import com.cburch.logisim.std.gates.GatesLibrary;
 import com.cburch.logisim.std.hdl.HdlLibrary;
 import com.cburch.logisim.std.io.IoLibrary;
@@ -56,7 +57,8 @@ public class Builtin extends Library {
             new TclLibrary(),
             new BfhLibrary(),
             new ExtraIoLibrary(),
-            new Soc());
+            new Soc(),
+            new ClassicLibrary());
   }
 
   @Override
