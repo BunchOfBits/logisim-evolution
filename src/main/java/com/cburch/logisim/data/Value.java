@@ -331,6 +331,24 @@ public class Value {
     return ret;
   }
 
+  /**
+   * Gets the most significant bit value.
+   *
+   * @return the most significant bit value.
+   */
+  public Value msb() {
+    return get(this.width - 1);
+  }
+
+  /**
+   * Gets the least significant bit value.
+   *
+   * @return the least significant bit value.
+   */
+  public Value lsb() {
+    return get(0);
+  }
+
   public BitWidth getBitWidth() {
     return BitWidth.create(width);
   }
@@ -622,5 +640,97 @@ public class Value {
           0,
           this.value ^ other.value);
     }
+  }
+
+  /**
+   * Shift one bit position to the left and insert the most
+   * significant bit value of the other value in the vacant position.
+   *
+   * @param other the other value.
+   * @return the shifted value.
+   */
+  public Value shl(Value other) {
+    if (this.width <= 0) {
+      return this;
+    }
+
+    final var msb = other.msb();
+
+    final var value = (this.value << 1) + msb.value;
+    final var error = (this.error << 1) + msb.error;
+    final var unknown = (this.unknown << 1) + msb.unknown;
+
+    return Value.create(this.width, error, unknown, value);
+  }
+
+  /**
+   * Shift one bit position to the left and insert
+   * a zero in the vacant position.
+   *
+   * @return the shifted value.
+   */
+  public Value shl() {
+    return shl(FALSE);
+  }
+
+  /**
+   * Shift the value one bit position to the left, inserting the old
+   * most significant bit value at the least significant bit position.
+   *
+   * @return the rotated value.
+   */
+  public Value rol() {
+    return shl(msb());
+  }
+
+  /**
+   * Shift one bit position to the right and insert the least
+   * significant bit value of the other value in the vacant position.
+   *
+   * @param other the other value.
+   * @return the shifted value.
+   */
+  public Value shr(Value other) {
+    if (this.width <= 0) {
+      return this;
+    }
+
+    final var lsb = other.lsb();
+
+    final var value = (this.value >> 1) + (lsb.value << (width - 1));
+    final var error = (this.error >> 1) + (lsb.error << (width - 1));
+    final var unknown = (this.unknown >> 1) + (lsb.unknown << (width - 1));
+
+    return Value.create(this.width, error, unknown, value);
+  }
+
+  /**
+   * Shift one bit position to the right and insert
+   * a zero in the vacant position.
+   *
+   * @return the shifted value.
+   */
+  public Value shr() {
+    return shr(FALSE);
+  }
+
+  /**
+   * Shift the value one bit position to the right, inserting the old
+   * least significant bit value at the most significant bit position.
+   *
+   * @return
+   */
+  public Value ror() {
+    return shr(lsb());
+  }
+
+  /**
+   * Arithmetic shift right: shift all bits one position to the right
+   * and duplicate the most significant bit.
+   *
+   * @return the arithmetically shifted value.
+   */
+  public Value asr() {
+    return shr(msb());
   }
 }
