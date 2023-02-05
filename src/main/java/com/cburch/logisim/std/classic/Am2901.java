@@ -75,7 +75,7 @@ public class Am2901 extends AbstractTtlGate {
   public static final byte C4 = 33;
   public static final byte OVR = 34;
   public static final byte F3 = 31;
-  public static final byte F_EQ_0 = 11;
+  public static final byte ZERO = 11;
 
   public static final byte Y0 = 36;
   public static final byte Y1 = 37;
@@ -100,6 +100,8 @@ public class Am2901 extends AbstractTtlGate {
   private static final Byte[] ALU_DST = new Byte[] { I6, I7, I8 };
   private static final Byte[] ALU_FUNC = new Byte[] { I3, I4, I5 };
   private static final Byte[] Y_OUTPUTS = new Byte[] { Y0, Y1, Y2, Y3 };
+  private static final Byte[] TTL_OUTPUTS = new Byte[] { Pn, Gn, C4, OVR, F3, ZERO };
+  private static final Byte[] SHIFT_OUTPUTS = new Byte[] { RAM0, RAM3, Q0, Q3 };
 
   private static final BitWidth REGISTER_WIDTH = BitWidth.create(4);
   private static final Value ZERO_DATA = Value.createKnown(REGISTER_WIDTH, 0);
@@ -152,34 +154,25 @@ public class Am2901 extends AbstractTtlGate {
     public Value overflow;  // OVR
     public Value zero;      // F = 0
 
-    public static AluResult ERROR = new AluResult() {
-      {
-        f = ERROR_DATA;
-        pn = Value.ERROR;
-        gn = Value.ERROR;
-        carryOut = Value.ERROR;
-        overflow = Value.ERROR;
-        zero = Value.ERROR;
-      }
-    };
+    private AluResult(Value f, Value pn, Value gn, Value carryOut, Value overflow, Value zero) {
+      this.f = f;
+      this.pn = pn;
+      this.gn = gn;
+      this.carryOut = carryOut;
+      this.overflow = overflow;
+      this.zero = zero;
+    }
 
-    public static AluResult UNKNOWN = new AluResult() {
-      {
-        f = UNKNOWN_DATA;
-        pn = Value.UNKNOWN;
-        gn = Value.UNKNOWN;
-        carryOut = Value.UNKNOWN;
-        overflow = Value.UNKNOWN;
-        zero = Value.UNKNOWN;
-      }
-    };
+    public static final AluResult ERROR = new AluResult(ERROR_DATA, Value.ERROR, Value.ERROR, Value.ERROR, Value.ERROR, Value.ERROR);
+
+    public static final AluResult UNKNOWN = new AluResult(UNKNOWN_DATA, Value.UNKNOWN, Value.UNKNOWN, Value.UNKNOWN, Value.UNKNOWN, Value.UNKNOWN);
   }
 
   public Am2901() {
     super(
             _ID,
             (byte) 40,
-            new byte[] { Pn, Gn, C4, OVR, F3, F_EQ_0, Y0, Y1, Y2, Y3, RAM0, RAM3, Q0, Q3 },
+            new byte[] { Pn, Gn, C4, OVR, F3, ZERO, Y0, Y1, Y2, Y3, RAM0, RAM3, Q0, Q3 },
             new String[] {
               "A3", "A2", "A1", "A0", "I6", "I8", "I7", "RAM3", "RAM0",
               "F=0", "I0", "I1", "I2", "CLK", "Q3", "B0", "B1", "B2", "B3",
@@ -260,10 +253,22 @@ public class Am2901 extends AbstractTtlGate {
   }
 
   /**
-   * Gets the value of a register from the register file
+   * Sets the pins to the Value.
    *
-   * @param i the index into the register file
-   * @return the value of the register
+   * @param pins the set of output pins.
+   * @param v the value to set.
+   */
+  private void setBitFieldValue(Byte[] pins, Value v) {
+    for (var pin : pins) {
+      setPort(pin, v.get(pin));
+    }
+  }
+
+  /**
+   * Gets the value of a register from the register file.
+   *
+   * @param i the index into the register file.
+   * @return the value of the register.
    */
   private Value getRegister(Value i) {
     // Filter ERROR bits in i
@@ -291,7 +296,41 @@ public class Am2901 extends AbstractTtlGate {
     return _data.getValue(i);
   }
 
-  private void setArithFlags(AluResult result, Value p, Value g) {
+  /**
+   * Sets the selected register in the register file to the specified value.
+   *
+   * @param i the index into the register file.
+   * @param v the value to store.
+   */
+  private void setRegister(Value i, Value v) {
+    // Filter ERROR bits in i
+    if (!i.isFullyDefined()) {
+      return;
+    }
+
+    var ix = i.toLongValue();
+
+    setRegister((int) ix, v);
+  }
+
+  /**
+   * Sets the selected register in the register file to the specified value.
+   *
+   * @param i the index into the register file.
+   * @param v the value to store.
+   */
+  private void setRegister(int i, Value v) {
+    _data.setValue(i, v);
+  }
+
+  /**
+   * Set the ALU flags for the arithmetic microcodes: "ADD", "SUB" and "SUBS".
+   *
+   * @param result the ALU result.
+   * @param p the "propagate" output from the ALU.
+   * @param g the "generate" output from the ALU.
+   */
+  private void setArithmeticFlags(AluResult result, Value p, Value g) {
     final var c0 = getPort(C0); // Already validated
     final var c1 = g.get(0).or(p.get(0).and(c0)); // C1 = G0 + P0C0
     final var c2 = g.get(1).or(p.get(1).and(c1)); // C2 = G1 + P1C1
@@ -323,6 +362,13 @@ public class Am2901 extends AbstractTtlGate {
     result.overflow = c4.xor(c3);
   }
 
+  /**
+   * Set the ALU flags for the logical-or microcode: "OR".
+   *
+   * @param result the ALU result.
+   * @param p the "propagate" output from the ALU.
+   * @param g the "generate" output from the ALU.
+   */
   private void setOrFlags(AluResult result, Value p, Value g) {
     final var c0 = getPort(C0); // Already validated
 
@@ -347,6 +393,13 @@ public class Am2901 extends AbstractTtlGate {
     result.overflow = result.carryOut;
   }
 
+  /**
+   * Set the ALU flags for the logical-and microcode: "AND" and "NOTRS".
+   *
+   * @param result the ALU result.
+   * @param p the "propagate" output from the ALU.
+   * @param g the "generate" output from the ALU.
+   */
   private void setAndFlags(AluResult result, Value p, Value g) {
     final var c0 = getPort(C0); // Already validated
 
@@ -372,6 +425,13 @@ public class Am2901 extends AbstractTtlGate {
     result.overflow = result.carryOut;
   }
 
+  /**
+   * Set the ALU flags for the logical-xor microcodes: "EXOR" and "EXNOR".
+   *
+   * @param result the ALU result.
+   * @param p the "propagate" output from the ALU.
+   * @param g the "generate" output from the ALU.
+   */
   private void setXorFlags(AluResult result, Value p, Value g) {
     final var c0 = getPort(C0); // Already validated
 
@@ -462,7 +522,7 @@ public class Am2901 extends AbstractTtlGate {
   }
 
   /**
-   * Get the ALU result
+   * Get the ALU result according to the ALU function microcode.
    *
    * @param operands the R and S ALU operands
    * @return the ALU result
@@ -483,18 +543,18 @@ public class Am2901 extends AbstractTtlGate {
       return AluResult.UNKNOWN;
     }
 
-    var result = new AluResult();
+    var result = AluResult.UNKNOWN;
 
     // Calculate F (the ALU result) and the result flags
     if (aluFunction == ADD) {
       result.f = Value.createKnown(REGISTER_WIDTH, r.toLongValue() + s.toLongValue() + c0.toLongValue());
-      setArithFlags(result, r.or(s), r.and(s));
+      setArithmeticFlags(result, r.or(s), r.and(s));
     } else if (aluFunction == SUBR) {
       result.f = Value.createKnown(REGISTER_WIDTH, s.toLongValue() - r.toLongValue() - c0.not().toLongValue());
-      setArithFlags(result, r.not().or(s), r.not().and(s));
+      setArithmeticFlags(result, r.not().or(s), r.not().and(s));
     } else if (aluFunction == SUBS) {
       result.f = Value.createKnown(REGISTER_WIDTH, r.toLongValue() - s.toLongValue() - c0.not().toLongValue());
-      setArithFlags(result, r.or(s.not()), r.and(s.not()));
+      setArithmeticFlags(result, r.or(s.not()), r.and(s.not()));
     } else if (aluFunction == OR) {
       result.f = r.or(s);
       setOrFlags(result, r.or(s), r.and(s));
@@ -515,18 +575,26 @@ public class Am2901 extends AbstractTtlGate {
     return result;
   }
 
+  /**
+   * Process the clock inputs to the various registers.
+   * A and B latches are triggered when the clock is high.
+   * Q is triggered at the rising edge.
+   * The register file is triggered when the clock is low.
+   *
+   * @param f the ALU output.
+   */
   private void propagateRegisters(Value f) {
     final var aSelect = getBitFieldValue(A_INPUTS);
     final var bSelect = getBitFieldValue(B_INPUTS);
 
     // A latch
     if (_data.updateClock(getPort(CLK), A_REG_IX, StdAttr.TRIG_HIGH)) {
-      _data.setValue(A_REG_IX, getRegister(aSelect));
+      setRegister(A_REG_IX, getRegister(aSelect));
     }
 
     // B latch
     if (_data.updateClock(getPort(CLK), B_REG_IX, StdAttr.TRIG_HIGH)) {
-      _data.setValue(B_REG_IX, getRegister(bSelect));
+      setRegister(B_REG_IX, getRegister(bSelect));
     }
 
     final var aluDest = getBitFieldValue(ALU_DST);
@@ -539,26 +607,125 @@ public class Am2901 extends AbstractTtlGate {
     // Q register
     if (_data.updateClock(getPort(CLK), Q_REG_IX, StdAttr.TRIG_RISING)) {
       if (aluDest == QREG) {
-        _data.setValue(Q_REG_IX, f);
+        setRegister(Q_REG_IX, f);
       } else if (aluDest == RAMQD) {
-        _data.setValue(Q_REG_IX, Q/2);
+        setRegister(Q_REG_IX, getRegister(Q_REG_IX).shr(getPort(Q3)));
       } else if (aluDest == RAMQU) {
-        _data.setValue(Q_REG_IX, Q * 2);
+        setRegister(Q_REG_IX, getRegister(Q_REG_IX).shl(getPort(Q0)));
       }
     }
-
-    final var b = (int) bSelect.toLongValue();
 
     // Register file
-    if (_data.updateClock(getPort(CLK), b, StdAttr.TRIG_LOW)) {
+    if (_data.updateClock(getPort(CLK), (int) bSelect.toLongValue(), StdAttr.TRIG_LOW)) {
       if (aluDest == RAMA || aluDest == RAMF) {
-        _data.setValue(b, F);
+        setRegister(bSelect, f);
       } else if (aluDest == RAMQD || aluDest == RAMD) {
-        _data.setValue(b, F/2);
+        setRegister(bSelect, f.shr(getPort(RAM3)));
       } else if (aluDest == RAMQU || aluDest == RAMU) {
-        _data.setValue(b, F * 2);
+        setRegister(bSelect, f.shl(getPort(RAM0)));
       }
     }
+  }
+
+  /**
+   * Set the bidirectional lines to high-Z according
+   * to the ALU destination microcode.
+   */
+  private void propagateBufferControl() {
+    final var aluDest = getBitFieldValue(ALU_DST);
+
+    if (aluDest.isFullyDefined()) {
+      if (aluDest != RAMQD && aluDest != RAMD) {
+        setPort(Q0, Value.UNKNOWN);
+        setPort(RAM0, Value.UNKNOWN);
+      }
+
+      if (aluDest != RAMQU && aluDest != RAMU) {
+        setPort(Q3, Value.UNKNOWN);
+        setPort(RAM3, Value.UNKNOWN);
+      }
+    }
+  }
+
+  private void propagateTtlOutputs(AluResult aluResult) {
+    final var aluSrc = getBitFieldValue(ALU_SRC);
+    final var aluFunc = getBitFieldValue(ALU_FUNC);
+
+    if (aluSrc.isErrorValue() || aluFunc.isErrorValue()) {
+      setBitFieldValue(TTL_OUTPUTS, Value.createError(BitWidth.create(TTL_OUTPUTS.length)));
+
+      return;
+    }
+
+    if (!aluSrc.isFullyDefined() || !aluFunc.isFullyDefined()) {
+      setBitFieldValue(TTL_OUTPUTS, Value.createUnknown(BitWidth.create(TTL_OUTPUTS.length)));
+
+      return;
+    }
+
+    setPort(Pn, aluResult.pn);
+    setPort(Gn, aluResult.gn);
+    setPort(C4, aluResult.carryOut);
+    setPort(OVR, aluResult.overflow);
+    setPort(F3, aluResult.f.get(3));
+    setPort(ZERO, aluResult.zero);
+  }
+
+  private void propagateShiftOutputs(AluResult aluResult) {
+    final var aluDest = getBitFieldValue(ALU_DST);
+
+    if (aluDest.isErrorValue()) {
+      setBitFieldValue(SHIFT_OUTPUTS, Value.createError(BitWidth.create(SHIFT_OUTPUTS.length)));
+
+      return;
+    }
+
+    if (!aluDest.isFullyDefined()) {
+      setBitFieldValue(SHIFT_OUTPUTS, Value.createUnknown(BitWidth.create(SHIFT_OUTPUTS.length)));
+
+      return;
+    }
+
+    if (aluDest == RAMQD || aluDest == RAMD) {
+      setPort(Q0, getRegister(Q_REG_IX).get(0));
+      setPort(RAM0, aluResult.f.get(0));
+    }
+
+    if (aluDest == RAMQU || aluDest == RAMU) {
+      setPort(Q3, getRegister(Q_REG_IX).get(3));
+      setPort(RAM3, aluResult.f.get(3));
+    }
+  }
+
+  private void propagateYOutputs(AluResult aluResult) {
+    final var oen = getPort(OEn);
+    final var aluDest = getBitFieldValue(ALU_DST);
+
+    if (oen.isErrorValue() || aluDest.isErrorValue()) {
+      setBitFieldValue(Y_OUTPUTS, ERROR_DATA);
+
+      return;
+    }
+
+    if (!oen.isFullyDefined() && !aluDest.isFullyDefined()) {
+      setBitFieldValue(Y_OUTPUTS, UNKNOWN_DATA);
+
+      return;
+    }
+
+    if (oen == Value.FALSE) {
+      if (aluDest == RAMA) {
+        setBitFieldValue(Y_OUTPUTS, getRegister(A_REG_IX));
+      } else {
+        setBitFieldValue(Y_OUTPUTS, aluResult.f);
+      }
+    }
+  }
+
+  private void propagateOutputs(AluResult aluResult) {
+    propagateTtlOutputs(aluResult);
+    propagateShiftOutputs(aluResult);
+    propagateYOutputs(aluResult);
   }
 
   @Override
@@ -566,9 +733,12 @@ public class Am2901 extends AbstractTtlGate {
     _state = state;
     _data = getData();
 
+    propagateBufferControl();
+
     final var operands = getAluOperands();
     final var aluResult = getAluResult(operands);
 
     propagateRegisters(aluResult.f);
+    propagateOutputs(aluResult);
   }
 }
