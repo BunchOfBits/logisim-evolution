@@ -15,7 +15,6 @@ import com.cburch.logisim.instance.InstancePainter;
 import com.cburch.logisim.instance.InstanceState;
 import com.cburch.logisim.instance.StdAttr;
 import com.cburch.logisim.std.ttl.AbstractTtlGate;
-import com.cburch.logisim.std.ttl.Drawgates;
 import com.cburch.logisim.std.ttl.TtlRegisterData;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 
@@ -173,6 +172,8 @@ public class Am2901 extends AbstractTtlGate {
             _ID,
             (byte) 40,
             new byte[] { Pn, Gn, C4, OVR, F3, ZERO, Y0, Y1, Y2, Y3, RAM0, RAM3, Q0, Q3 },
+            new byte[] { VCC },
+            new byte[] { GND },
             new String[] {
               "A3", "A2", "A1", "A0", "I6", "I8", "I7", "RAM3", "RAM0",
               "F=0", "I0", "I1", "I2", "CLK", "Q3", "B0", "B1", "B2", "B3",
@@ -186,7 +187,6 @@ public class Am2901 extends AbstractTtlGate {
   @Override
   public void paintInternal(InstancePainter painter, int x, int y, int height, boolean up) {
     super.paintBase(painter, true, false);
-    Drawgates.paintPortNames(painter, x, y, height, portNames);
   }
 
   /** IC pin indices are datasheet based (1-indexed), but ports are 0-indexed

@@ -31,27 +31,33 @@ import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.Point;
 import java.awt.event.MouseEvent;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
+import java.util.LinkedList;
 
 public abstract class AbstractTtlGate extends InstanceFactory {
   protected static final int PIN_WIDTH = 10;
   protected static final int PIN_HEIGHT = 7;
   private int height = 60;
-  protected final byte pinNumber;
+  protected final byte nrOfPins;
   private final String name;
   private byte numberOfGatesToDraw = 0;
   protected String[] portNames = null;
   private final HashSet<Byte> outputPorts = new HashSet<>();
   private final HashSet<Byte> unusedPins = new HashSet<>();
+  private final HashSet<Byte> powerPins = new HashSet<>();
+  private final HashSet<Byte> groundPins = new HashSet<>();
 
   /**
    * @param name = name to display in the center of the TTl
    * @param pins = the total number of pins (GND and VCC included)
    * @param outputPorts = an array with the indexes of the output ports (indexes are the same you
    *     can find on Google searching the TTL you want to add)
+   * @param generator = the HDL generator.
+   * @param powerPins = an array with the indexes op the power pins (indexes are similar to outputPorts)
    */
-  protected AbstractTtlGate(
-      String name, byte pins, byte[] outputPorts, HdlGeneratorFactory generator) {
+  protected AbstractTtlGate(String name, byte pins, byte[] outputPorts, byte[] powerPins, byte[] groundPins, HdlGeneratorFactory generator) {
     super(name, generator);
     setIconName("ttl.gif");
     setAttributes(
@@ -61,8 +67,30 @@ public abstract class AbstractTtlGate extends InstanceFactory {
         new Object[] {Direction.EAST, false, false, ""});
     setFacingAttribute(StdAttr.FACING);
     this.name = name;
-    this.pinNumber = pins;
-    for (byte outputport : outputPorts) this.outputPorts.add(outputport);
+    this.nrOfPins = pins;
+
+    for (byte outputPort : outputPorts) {
+      this.outputPorts.add(outputPort);
+    }
+
+    for (var pin : powerPins) {
+      this.powerPins.add(pin);
+    }
+
+    for (var pin : groundPins) {
+      this.groundPins.add(pin);
+    }
+  }
+
+  /**
+   * @param name = name to display in the center of the TTl
+   * @param pins = the total number of pins (GND and VCC included)
+   * @param outputPorts = an array with the indexes of the output ports (indexes are the same you
+   *     can find on Google searching the TTL you want to add)
+   */
+  protected AbstractTtlGate(String name, byte pins, byte[] outputPorts, HdlGeneratorFactory generator) {
+    // The bottom-right and top-left pins of TTL chips are usually their power pins.
+    this(name, pins, outputPorts, new byte[] { pins }, new byte[] { (byte) (pins / 2) }, generator);
   }
 
   protected AbstractTtlGate(
@@ -143,6 +171,23 @@ public abstract class AbstractTtlGate extends InstanceFactory {
     this.portNames = ttlPortNames;
   }
 
+  protected AbstractTtlGate(
+          String name,
+          byte pins,
+          byte[] outputPorts,
+          byte[] powerPins,
+          byte[] groundPins,
+          String[] ttlPortNames,
+          int height,
+          HdlGeneratorFactory generator) {
+    // the ttl name, the total number of pins and an array with the indexes of
+    // output ports (indexes are the one you can find on Google), an array of
+    // strings which will be tooltips of the corresponding port in order
+    this(name, pins, outputPorts, powerPins, groundPins, generator);
+    this.height = height;
+    this.portNames = ttlPortNames;
+  }
+
   private void computeTextField(Instance instance) {
     final var bds = instance.getBounds();
     final var dir = instance.getAttributeValue(StdAttr.FACING);
@@ -174,7 +219,7 @@ public abstract class AbstractTtlGate extends InstanceFactory {
   @Override
   public Bounds getOffsetBounds(AttributeSet attrs) {
     final var dir = attrs.getValue(StdAttr.FACING);
-    return Bounds.create(0, -30, this.pinNumber * 10, height).rotate(Direction.EAST, dir, 0, 0);
+    return Bounds.create(0, -30, this.nrOfPins * 10, height).rotate(Direction.EAST, dir, 0, 0);
   }
 
   @Override
@@ -217,6 +262,8 @@ public abstract class AbstractTtlGate extends InstanceFactory {
     final var bds = painter.getBounds();
     final var x = bds.getX();
     final var y = bds.getY();
+    final var horizontal = (dir == Direction.WEST || dir == Direction.EAST);
+
     var xp = x;
     var yp = y;
     var width = bds.getWidth();
@@ -224,51 +271,56 @@ public abstract class AbstractTtlGate extends InstanceFactory {
     if (!ghost) {
       g.setColor(new Color(AppPreferences.COMPONENT_COLOR.get()));
     }
-    for (byte i = 0; i < this.pinNumber; i++) {
-      if (i < this.pinNumber / 2) {
-        if (dir == Direction.WEST || dir == Direction.EAST) xp = i * 20 + (10 - PIN_WIDTH / 2) + x;
-        else yp = i * 20 + (10 - PIN_WIDTH / 2) + y;
+
+    // Draw pins
+    for (byte i = 0; i < this.nrOfPins; i++) {
+      if (i < this.nrOfPins / 2) {
+        if (horizontal) {
+          xp = i * 20 + (10 - PIN_WIDTH / 2) + x;
+        } else {
+          yp = i * 20 + (10 - PIN_WIDTH / 2) + y;
+        }
       } else {
-        if (dir == Direction.WEST || dir == Direction.EAST) {
-          xp = (i - this.pinNumber / 2) * 20 + (10 - PIN_WIDTH / 2) + x;
+        if (horizontal) {
+          xp = (i - this.nrOfPins / 2) * 20 + (10 - PIN_WIDTH / 2) + x;
           yp = height + y - PIN_HEIGHT;
         } else {
-          yp = (i - this.pinNumber / 2) * 20 + (10 - PIN_WIDTH / 2) + y;
+          yp = (i - this.nrOfPins / 2) * 20 + (10 - PIN_WIDTH / 2) + y;
           xp = width + x - PIN_HEIGHT;
         }
       }
-      if (dir == Direction.WEST || dir == Direction.EAST) {
-        // fill the background of white if selected from preferences
+      if (horizontal) {
         g.drawRect(xp, yp, PIN_WIDTH, PIN_HEIGHT);
       } else {
-        // fill the background of white if selected from preferences
         g.drawRect(xp, yp, PIN_HEIGHT, PIN_WIDTH);
       }
     }
+
+    // Draw body
     if (dir == Direction.SOUTH) {
-      // fill the background of white if selected from preferences
       g.drawRoundRect(x + PIN_HEIGHT, y, bds.getWidth() - PIN_HEIGHT * 2, bds.getHeight(), 10, 10);
       g.drawArc(x + width / 2 - 7, y - 7, 14, 14, 180, 180);
     } else if (dir == Direction.WEST) {
-      // fill the background of white if selected from preferences
       g.drawRoundRect(x, y + PIN_HEIGHT, bds.getWidth(), bds.getHeight() - PIN_HEIGHT * 2, 10, 10);
       g.drawArc(x + width - 7, y + height / 2 - 7, 14, 14, 90, 180);
     } else if (dir == Direction.NORTH) {
-      // fill the background of white if selected from preferences
       g.drawRoundRect(x + PIN_HEIGHT, y, bds.getWidth() - PIN_HEIGHT * 2, bds.getHeight(), 10, 10);
       g.drawArc(x + width / 2 - 7, y + height - 7, 14, 14, 0, 180);
     } else { // east
-      // fill the background of white if selected from preferences
       g.drawRoundRect(x, y + PIN_HEIGHT, bds.getWidth(), bds.getHeight() - PIN_HEIGHT * 2, 10, 10);
       g.drawArc(x - 7, y + height / 2 - 7, 14, 14, 270, 180);
     }
+
+    // Draw label
     g.rotate(Math.toRadians(-dir.toDegrees()), x + width / 2, y + height / 2);
     if (drawname) {
       g.setFont(new Font(Font.DIALOG_INPUT, Font.BOLD, 14));
       GraphicsUtil.drawCenteredText(
           g, this.name, x + bds.getWidth() / 2, y + bds.getHeight() / 2 - 4);
     }
-    if (dir == Direction.WEST || dir == Direction.EAST) {
+
+    // Draw power labels
+    if (horizontal) {
       xp = x;
       yp = y;
     } else {
@@ -290,84 +342,101 @@ public abstract class AbstractTtlGate extends InstanceFactory {
   @Override
   public void paintInstance(InstancePainter painter) {
     painter.drawPorts();
-    final var g = (Graphics2D) painter.getGraphics();
     painter.drawLabel();
-    if (!painter.getAttributeValue(TtlLibrary.DRAW_INTERNAL_STRUCTURE)) {
+
+    if (painter.getAttributeValue(TtlLibrary.DRAW_INTERNAL_STRUCTURE)) {
+      paintInternalBase(painter);
+    } else {
+      final var g = (Graphics2D) painter.getGraphics();
       final var dir = painter.getAttributeValue(StdAttr.FACING);
       final var bds = painter.getBounds();
       final var x = bds.getX();
       final var y = bds.getY();
-      var xp = x;
-      var yp = y;
       final var width = bds.getWidth();
       final var height = bds.getHeight();
-      for (byte i = 0; i < this.pinNumber; i++) {
-        if (i == this.pinNumber / 2) {
-          xp = x;
-          yp = y;
-          if (dir == Direction.WEST || dir == Direction.EAST) {
-            g.setColor(Color.DARK_GRAY.darker());
-            g.fillRoundRect(xp, yp + PIN_HEIGHT, width, height - PIN_HEIGHT * 2 + 2, 10, 10);
-            g.setColor(Color.DARK_GRAY);
-            g.fillRoundRect(xp, yp + PIN_HEIGHT, width, height - PIN_HEIGHT * 2 - 2, 10, 10);
-            g.setColor(Color.BLACK);
-            g.drawRoundRect(xp, yp + PIN_HEIGHT, width, height - PIN_HEIGHT * 2 - 2, 10, 10);
-            g.drawRoundRect(xp, yp + PIN_HEIGHT, width, height - PIN_HEIGHT * 2 + 2, 10, 10);
-          } else {
-            g.setColor(Color.DARK_GRAY.darker());
-            g.fillRoundRect(xp + PIN_HEIGHT, yp, width - PIN_HEIGHT * 2, height, 10, 10);
-            g.setColor(Color.DARK_GRAY);
-            g.fillRoundRect(xp + PIN_HEIGHT, yp, width - PIN_HEIGHT * 2, height - 4, 10, 10);
-            g.setColor(Color.BLACK);
-            g.drawRoundRect(xp + PIN_HEIGHT, yp, width - PIN_HEIGHT * 2, height - 4, 10, 10);
-            g.drawRoundRect(xp + PIN_HEIGHT, yp, width - PIN_HEIGHT * 2, height, 10, 10);
-          }
-          if (dir == Direction.SOUTH) g.fillArc(xp + width / 2 - 7, yp - 7, 14, 14, 180, 180);
-          else if (dir == Direction.WEST)
-            g.fillArc(xp + width - 7, yp + height / 2 - 7, 14, 14, 90, 180);
-          else if (dir == Direction.NORTH)
-            g.fillArc(xp + width / 2 - 7, yp + height - 11, 14, 14, 0, 180);
-          else // east
-            g.fillArc(xp - 7, yp + height / 2 - 7, 14, 14, 270, 180);
-        }
-        if (i < this.pinNumber / 2) {
-          if (dir == Direction.WEST || dir == Direction.EAST)
+      final var horizontal = (dir == Direction.WEST || dir == Direction.EAST);
+
+      var xp = x;
+      var yp = y;
+
+      // Draw body
+      g.setColor(Color.DARK_GRAY.darker());
+
+      if (horizontal) {
+        g.fillRoundRect(xp, yp + PIN_HEIGHT, width, height - PIN_HEIGHT * 2 + 2, 10, 10);
+        g.setColor(Color.DARK_GRAY);
+        g.fillRoundRect(xp, yp + PIN_HEIGHT, width, height - PIN_HEIGHT * 2 - 2, 10, 10);
+        g.setColor(Color.BLACK);
+        g.drawRoundRect(xp, yp + PIN_HEIGHT, width, height - PIN_HEIGHT * 2 - 2, 10, 10);
+        g.drawRoundRect(xp, yp + PIN_HEIGHT, width, height - PIN_HEIGHT * 2 + 2, 10, 10);
+      } else {
+        g.fillRoundRect(xp + PIN_HEIGHT, yp, width - PIN_HEIGHT * 2, height, 10, 10);
+        g.setColor(Color.DARK_GRAY);
+        g.fillRoundRect(xp + PIN_HEIGHT, yp, width - PIN_HEIGHT * 2, height - 4, 10, 10);
+        g.setColor(Color.BLACK);
+        g.drawRoundRect(xp + PIN_HEIGHT, yp, width - PIN_HEIGHT * 2, height - 4, 10, 10);
+        g.drawRoundRect(xp + PIN_HEIGHT, yp, width - PIN_HEIGHT * 2, height, 10, 10);
+      }
+
+      // Draw pin 1 marker
+      if (dir == Direction.SOUTH) {
+        g.fillArc(xp + width / 2 - 7, yp - 7, 14, 14, 180, 180);
+      } else if (dir == Direction.WEST) {
+        g.fillArc(xp + width - 7, yp + height / 2 - 7, 14, 14, 90, 180);
+      } else if (dir == Direction.NORTH) {
+        g.fillArc(xp + width / 2 - 7, yp + height - 11, 14, 14, 0, 180);
+      } else { // East
+        g.fillArc(xp - 7, yp + height / 2 - 7, 14, 14, 270, 180);
+      }
+
+      // Draw pins
+      for (byte i = 0; i < this.nrOfPins; i++) {
+        if (i < this.nrOfPins / 2) {
+          if (horizontal) {
             xp = i * 20 + (10 - PIN_WIDTH / 2) + x;
-          else yp = i * 20 + (10 - PIN_WIDTH / 2) + y;
+          } else {
+            yp = i * 20 + (10 - PIN_WIDTH / 2) + y;
+          }
         } else {
-          if (dir == Direction.WEST || dir == Direction.EAST) {
-            xp = (i - this.pinNumber / 2) * 20 + (10 - PIN_WIDTH / 2) + x;
+          if (horizontal) {
+            xp = (i - this.nrOfPins / 2) * 20 + (10 - PIN_WIDTH / 2) + x;
             yp = height + y - PIN_HEIGHT;
           } else {
-            yp = (i - this.pinNumber / 2) * 20 + (10 - PIN_WIDTH / 2) + y;
+            yp = (i - this.nrOfPins / 2) * 20 + (10 - PIN_WIDTH / 2) + y;
             xp = width + x - PIN_HEIGHT;
           }
         }
-        if (dir == Direction.WEST || dir == Direction.EAST) {
-          g.setColor(Color.LIGHT_GRAY);
+
+        // Draw pin
+        g.setColor(Color.LIGHT_GRAY);
+
+        if (horizontal) {
           g.fillRect(xp, yp, PIN_WIDTH, PIN_HEIGHT);
           g.setColor(Color.BLACK);
           g.drawRect(xp, yp, PIN_WIDTH, PIN_HEIGHT);
         } else {
-          g.setColor(Color.LIGHT_GRAY);
           g.fillRect(xp, yp, PIN_HEIGHT, PIN_WIDTH);
           g.setColor(Color.BLACK);
           g.drawRect(xp, yp, PIN_HEIGHT, PIN_WIDTH);
         }
       }
 
+      // Draw name
       g.setColor(Color.LIGHT_GRAY.brighter());
       g.rotate(Math.toRadians(-dir.toDegrees()), x + width / 2, y + height / 2);
       g.setFont(new Font(Font.DIALOG_INPUT, Font.BOLD, 14));
       GraphicsUtil.drawCenteredText(g, this.name, x + width / 2, y + height / 2 - 4);
       g.setFont(new Font(Font.DIALOG_INPUT, Font.BOLD, 7));
-      if (dir == Direction.WEST || dir == Direction.EAST) {
+
+      // Draw power pins
+      if (horizontal) {
         xp = x;
         yp = y;
       } else {
         xp = x + (width - height) / 2;
         yp = y + (height - width) / 2;
       }
+
       if (dir == Direction.SOUTH) {
         GraphicsUtil.drawCenteredText(g, "Vcc", xp + 10, yp + PIN_HEIGHT + 4);
         GraphicsUtil.drawCenteredText(g, "GND", xp + height - 14, yp + width - PIN_HEIGHT - 8);
@@ -381,7 +450,7 @@ public abstract class AbstractTtlGate extends InstanceFactory {
         GraphicsUtil.drawCenteredText(g, "Vcc", xp + 10, yp + PIN_HEIGHT + 4);
         GraphicsUtil.drawCenteredText(g, "GND", xp + width - 10, yp + height - PIN_HEIGHT - 10);
       }
-    } else paintInternalBase(painter);
+    }
   }
 
   /**
@@ -401,19 +470,23 @@ public abstract class AbstractTtlGate extends InstanceFactory {
   private void paintInternalBase(InstancePainter painter) {
     final var dir = painter.getAttributeValue(StdAttr.FACING);
     final var bds = painter.getBounds();
+    final var vertical = (dir == Direction.SOUTH || dir == Direction.NORTH);
+
     var x = bds.getX();
     var y = bds.getY();
     var width = bds.getWidth();
     var height = bds.getHeight();
-    if (dir == Direction.SOUTH || dir == Direction.NORTH) {
+
+    if (vertical) {
       x += (width - height) / 2;
       y += (height - width) / 2;
       width = bds.getHeight();
       height = bds.getWidth();
     }
 
-    if (this.numberOfGatesToDraw == 0) paintInternal(painter, x, y, height, false);
-    else {
+    if (this.numberOfGatesToDraw == 0) {
+      paintInternal(painter, x, y, height, false);
+    } else {
       paintBase(painter, false, false);
       for (byte i = 0; i < this.numberOfGatesToDraw; i++) {
         paintInternal(
@@ -434,11 +507,11 @@ public abstract class AbstractTtlGate extends InstanceFactory {
   public void propagate(InstanceState state) {
     final var NrOfUnusedPins = unusedPins.size();
     if (state.getAttributeValue(TtlLibrary.VCC_GND)
-        && (state.getPortValue(this.pinNumber - 2 - NrOfUnusedPins) != Value.FALSE
-            || state.getPortValue(this.pinNumber - 1 - NrOfUnusedPins) != Value.TRUE)) {
+        && (state.getPortValue(this.nrOfPins - 2 - NrOfUnusedPins) != Value.FALSE
+            || state.getPortValue(this.nrOfPins - 1 - NrOfUnusedPins) != Value.TRUE)) {
       var port = 0;
-      for (byte i = 1; i <= pinNumber; i++) {
-        if (!unusedPins.contains(i) && (i != (pinNumber / 2))) {
+      for (byte i = 1; i <= nrOfPins; i++) {
+        if (!unusedPins.contains(i) && (i != (nrOfPins / 2))) {
           if (outputPorts.contains(i)) state.setPort(port, Value.UNKNOWN, 1);
           port++;
         }
@@ -450,88 +523,126 @@ public abstract class AbstractTtlGate extends InstanceFactory {
 
   private void updatePorts(Instance instance) {
     final var bds = instance.getBounds();
-    final var dir = instance.getAttributeValue(StdAttr.FACING);
-    var dx = 0;
-    var dy = 0;
     final var width = bds.getWidth();
     final var height = bds.getHeight();
-    byte portindex = 0;
-    var isoutput = false;
-    var hasvccgnd = instance.getAttributeValue(TtlLibrary.VCC_GND);
-    var skip = false;
-    final var NrOfUnusedPins = unusedPins.size();
-    /*
-     * array port is composed in this order: lower ports less GND, upper ports less
-     * Vcc, GND, Vcc
-     */
-    final var ps =
-        new Port[hasvccgnd ? this.pinNumber - NrOfUnusedPins : this.pinNumber - 2 - NrOfUnusedPins];
+    final var dir = instance.getAttributeValue(StdAttr.FACING);
+    final var enableVccGndPorts = instance.getAttributeValue(TtlLibrary.VCC_GND);
 
-    for (byte i = 0; i < this.pinNumber; i++) {
-      isoutput = outputPorts.contains((byte) (i + 1));
-      skip = unusedPins.contains((byte) (i + 1));
+    final var ioPorts = new ArrayList<Port>();
+    final var powerPorts = new ArrayList<Port>();
+    final var groundPorts = new ArrayList<Port>();
+
+    final var names = new LinkedList<String>();
+
+    if (portNames != null) {
+      names.addAll(Arrays.asList(portNames));
+    }
+
+    for (byte portNr = 0; portNr < this.nrOfPins; portNr++) {
+      final var pinNr = (byte) (portNr + 1);
+
+      final var isUnused = unusedPins.contains(pinNr);
+      final var isPower = powerPins.contains(pinNr);
+      final var isGround = groundPins.contains(pinNr);
+      final var isOutput = outputPorts.contains(pinNr);
+      final var isInput = !isUnused && !isPower && !isGround && !isOutput;
+
+      final var isLowerRow = (portNr < this.nrOfPins / 2);
+      final var isUpperRow = !isLowerRow;
+
+      var dx = 0;
+      var dy = 0;
+
       // set the position
-      if (i < this.pinNumber / 2) {
+      if (isLowerRow) {
         if (dir == Direction.EAST) {
-          dx = i * 20 + 10;
+          dx = portNr * 20 + 10;
           dy = height - 30;
         } else if (dir == Direction.WEST) {
-          dx = -10 - 20 * i;
+          dx = -10 - 20 * portNr;
           dy = 30 - height;
         } else if (dir == Direction.NORTH) {
           dx = width - 30;
-          dy = -10 - 20 * i;
+          dy = -10 - 20 * portNr;
         } else { // SOUTH
           dx = 30 - width;
-          dy = i * 20 + 10;
+          dy = portNr * 20 + 10;
         }
-      } else {
+      }
+
+      if (isUpperRow) {
         if (dir == Direction.EAST) {
-          dx = width - (i - this.pinNumber / 2) * 20 - 10;
+          dx = width - (portNr - this.nrOfPins / 2) * 20 - 10;
           dy = -30;
         } else if (dir == Direction.WEST) {
-          dx = -width + (i - this.pinNumber / 2) * 20 + 10;
+          dx = -width + (portNr - this.nrOfPins / 2) * 20 + 10;
           dy = 30;
         } else if (dir == Direction.NORTH) {
           dx = -30;
-          dy = -height + (i - this.pinNumber / 2) * 20 + 10;
+          dy = -height + (portNr - this.nrOfPins / 2) * 20 + 10;
         } else { // SOUTH
           dx = 30;
-          dy = height - (i - this.pinNumber / 2) * 20 - 10;
+          dy = height - (portNr - this.nrOfPins / 2) * 20 - 10;
         }
       }
-      // Set the port (output/input)
-      if (skip) {
-        portindex--;
-      } else if (isoutput) { // output port
-        ps[portindex] = new Port(dx, dy, Port.OUTPUT, 1);
-        if (this.portNames == null || this.portNames.length <= portindex)
-          ps[portindex].setToolTip(S.getter("demultiplexerOutTip", ": " + (i + 1)));
-        else
-          ps[portindex].setToolTip(
-              S.getter("demultiplexerOutTip", (i + 1) + ": " + this.portNames[portindex]));
-      } else { // input port
-        if (hasvccgnd && i == this.pinNumber - 1) { // Vcc
-          ps[ps.length - 1] = new Port(dx, dy, Port.INPUT, 1);
-          ps[ps.length - 1].setToolTip(S.getter("VCCPin", Integer.toString(this.pinNumber)));
-        } else if (i == this.pinNumber / 2 - 1) { // GND
-          if (hasvccgnd) {
-            ps[ps.length - 2] = new Port(dx, dy, Port.INPUT, 1);
-            ps[ps.length - 2].setToolTip(S.getter("GNDPin", Integer.toString(this.pinNumber / 2)));
-          }
-          portindex--;
-        } else if (i != this.pinNumber - 1 && i != this.pinNumber / 2 - 1) { // normal output
-          ps[portindex] = new Port(dx, dy, Port.INPUT, 1);
-          if (this.portNames == null || this.portNames.length <= portindex)
-            ps[portindex].setToolTip(S.getter("multiplexerInTip", ": " + (i + 1)));
-          else
-            ps[portindex].setToolTip(
-                S.getter("multiplexerInTip", (i + 1) + ": " + this.portNames[portindex]));
+
+      if (isPower) {
+        if (enableVccGndPorts) {
+          var port = new Port(dx, dy, Port.INPUT, 1);
+
+          port.setToolTip(S.getter("VCCPin", Integer.toString(pinNr)));
+          powerPorts.add(port);
         }
       }
-      portindex++;
+
+      if (isGround) {
+        if (enableVccGndPorts) {
+          var port = new Port(dx, dy, Port.INPUT, 1);
+
+          port.setToolTip(S.getter("GNDPin", Integer.toString(pinNr)));
+          groundPorts.add(port);
+        }
+      }
+
+      if (isOutput) {
+        var port = new Port(dx, dy, Port.OUTPUT, 1);
+
+        if (names.size() == 0) {
+          port.setToolTip(S.getter("demultiplexerOutTip", ": " + pinNr));
+        } else {
+          port.setToolTip(S.getter("demultiplexerOutTip", pinNr + ": " + names.removeFirst()));
+        }
+
+        ioPorts.add(port);
+      }
+
+      if (isInput) {
+        var port = new Port(dx, dy, Port.INPUT, 1);
+
+        if (names.size() == 0) {
+          port.setToolTip(S.getter("multiplexerInTip", ": " + pinNr));
+        } else {
+          port.setToolTip(S.getter("multiplexerInTip", pinNr + ": " + names.removeFirst()));
+        }
+
+        ioPorts.add(port);
+      }
     }
-    instance.setPorts(ps);
+
+    /*
+     * array port is composed in this order:
+     * - lower ports excluding power/ground pins and unused pins
+     * - upper ports excluding power/ground pins and unused pins
+     * - power pins
+     * - ground pins
+     */
+    final var ports = new ArrayList<Port>();
+
+    ports.addAll(ioPorts);
+    ports.addAll(powerPorts);
+    ports.addAll(groundPorts);
+
+    instance.setPorts(ports.toArray(new Port[0]));
   }
 
   @Override
