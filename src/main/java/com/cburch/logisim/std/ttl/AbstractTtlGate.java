@@ -256,7 +256,11 @@ public abstract class AbstractTtlGate extends InstanceFactory {
     return new Point(x, y);
   }
 
-  protected void paintBase(InstancePainter painter, boolean drawname, boolean ghost) {
+  private interface Arc {
+    void draw(int x, int y, int width, int height, int startAngle, int arcAngle);
+  }
+
+  protected void paintBase(InstancePainter painter, boolean drawName, boolean ghost) {
     final var dir = painter.getAttributeValue(StdAttr.FACING);
     final var g = (Graphics2D) painter.getGraphics();
     final var bds = painter.getBounds();
@@ -273,22 +277,23 @@ public abstract class AbstractTtlGate extends InstanceFactory {
     }
 
     // Draw pins
-    for (byte i = 0; i < this.nrOfPins; i++) {
-      if (i < this.nrOfPins / 2) {
+    for (byte pinNr = 1; pinNr <= this.nrOfPins; pinNr++) {
+      if (pinNr <= this.nrOfPins / 2) {
         if (horizontal) {
-          xp = i * 20 + (10 - PIN_WIDTH / 2) + x;
+          xp = pinNr * 20 - (PIN_WIDTH / 2) - 10 + x;
         } else {
-          yp = i * 20 + (10 - PIN_WIDTH / 2) + y;
+          yp = pinNr * 20 - (PIN_WIDTH / 2) - 10 + y;
         }
       } else {
         if (horizontal) {
-          xp = (i - this.nrOfPins / 2) * 20 + (10 - PIN_WIDTH / 2) + x;
+          xp = (pinNr - this.nrOfPins / 2) * 20 - (PIN_WIDTH / 2) - 10 + x;
           yp = height + y - PIN_HEIGHT;
         } else {
-          yp = (i - this.nrOfPins / 2) * 20 + (10 - PIN_WIDTH / 2) + y;
+          yp = (pinNr - this.nrOfPins / 2) * 20 - (PIN_WIDTH / 2) - 10 + y;
           xp = width + x - PIN_HEIGHT;
         }
       }
+
       if (horizontal) {
         g.drawRect(xp, yp, PIN_WIDTH, PIN_HEIGHT);
       } else {
@@ -297,26 +302,54 @@ public abstract class AbstractTtlGate extends InstanceFactory {
     }
 
     // Draw body
-    if (dir == Direction.SOUTH) {
-      g.drawRoundRect(x + PIN_HEIGHT, y, bds.getWidth() - PIN_HEIGHT * 2, bds.getHeight(), 10, 10);
-      g.drawArc(x + width / 2 - 7, y - 7, 14, 14, 180, 180);
-    } else if (dir == Direction.WEST) {
-      g.drawRoundRect(x, y + PIN_HEIGHT, bds.getWidth(), bds.getHeight() - PIN_HEIGHT * 2, 10, 10);
-      g.drawArc(x + width - 7, y + height / 2 - 7, 14, 14, 90, 180);
-    } else if (dir == Direction.NORTH) {
-      g.drawRoundRect(x + PIN_HEIGHT, y, bds.getWidth() - PIN_HEIGHT * 2, bds.getHeight(), 10, 10);
-      g.drawArc(x + width / 2 - 7, y + height - 7, 14, 14, 0, 180);
-    } else { // east
-      g.drawRoundRect(x, y + PIN_HEIGHT, bds.getWidth(), bds.getHeight() - PIN_HEIGHT * 2, 10, 10);
-      g.drawArc(x - 7, y + height / 2 - 7, 14, 14, 270, 180);
+    if (horizontal) {
+      if (ghost) {
+        g.drawRoundRect(x, y + PIN_HEIGHT, width, height - PIN_HEIGHT * 2, 10, 10);
+      } else {
+        g.setColor(Color.DARK_GRAY.darker());
+        g.fillRoundRect(x, y + PIN_HEIGHT, width, height - PIN_HEIGHT * 2 + 2, 10, 10);
+        g.setColor(Color.DARK_GRAY);
+        g.fillRoundRect(x, y + PIN_HEIGHT, width, height - PIN_HEIGHT * 2 - 2, 10, 10);
+        g.setColor(Color.BLACK);
+        g.drawRoundRect(x, y + PIN_HEIGHT, width, height - PIN_HEIGHT * 2 - 2, 10, 10);
+        g.drawRoundRect(x, y + PIN_HEIGHT, width, height - PIN_HEIGHT * 2 + 2, 10, 10);
+      }
+    } else {
+      if (ghost) {
+        g.drawRoundRect(x + PIN_HEIGHT, y, width - PIN_HEIGHT * 2, height, 10, 10);
+      } else {
+        g.setColor(Color.DARK_GRAY.darker());
+        g.fillRoundRect(x + PIN_HEIGHT, y, width - PIN_HEIGHT * 2, height, 10, 10);
+        g.setColor(Color.DARK_GRAY);
+        g.fillRoundRect(x + PIN_HEIGHT, y, width - PIN_HEIGHT * 2, height - 4, 10, 10);
+        g.setColor(Color.BLACK);
+        g.drawRoundRect(x + PIN_HEIGHT, y, width - PIN_HEIGHT * 2, height - 4, 10, 10);
+        g.drawRoundRect(x + PIN_HEIGHT, y, width - PIN_HEIGHT * 2, height, 10, 10);
+      }
     }
 
-    // Draw label
+    Arc arc = ghost ? g::drawArc : g::fillArc;
+
+    // Draw pin 1 marker
+    if (dir == Direction.SOUTH) {
+      arc.draw(x + width / 2 - 7, y - 7, 14, 14, 180, 180);
+    } else if (dir == Direction.WEST) {
+      arc.draw(x + width - 7, y + height / 2 - 7, 14, 14, 90, 180);
+    } else if (dir == Direction.NORTH) {
+      arc.draw(x + width / 2 - 7, y + height - (ghost ? 7 : 11), 14, 14, 0, 180);
+    } else { // east
+      arc.draw(x - 7, y + height / 2 - 7, 14, 14, 270, 180);
+    }
+
     g.rotate(Math.toRadians(-dir.toDegrees()), x + width / 2, y + height / 2);
-    if (drawname) {
+
+    // Draw name
+    if (drawName) {
+      if (!ghost) {
+        g.setColor(Color.LIGHT_GRAY.brighter());
+      }
       g.setFont(new Font(Font.DIALOG_INPUT, Font.BOLD, 14));
-      GraphicsUtil.drawCenteredText(
-          g, this.name, x + bds.getWidth() / 2, y + bds.getHeight() / 2 - 4);
+      GraphicsUtil.drawCenteredText(g, this.name, x + width / 2, y + height / 2 - 4);
     }
 
     // Draw power labels
@@ -347,6 +380,8 @@ public abstract class AbstractTtlGate extends InstanceFactory {
     if (painter.getAttributeValue(TtlLibrary.DRAW_INTERNAL_STRUCTURE)) {
       paintInternalBase(painter);
     } else {
+      paintBase(painter, true, false);
+      /*
       final var g = (Graphics2D) painter.getGraphics();
       final var dir = painter.getAttributeValue(StdAttr.FACING);
       final var bds = painter.getBounds();
@@ -390,19 +425,23 @@ public abstract class AbstractTtlGate extends InstanceFactory {
       }
 
       // Draw pins
-      for (byte i = 0; i < this.nrOfPins; i++) {
-        if (i < this.nrOfPins / 2) {
+      for (byte portNr = 0; portNr < this.nrOfPins; portNr++) {
+        final var pinNr = portNr + 1;
+        final var isLowerRow = (pinNr <= nrOfPins / 2);
+        final var isUpperRow = !isLowerRow;
+
+        if (pinNr <= this.nrOfPins / 2) {
           if (horizontal) {
-            xp = i * 20 + (10 - PIN_WIDTH / 2) + x;
+            xp = pinNr * 20 + (10 - PIN_WIDTH / 2) - 20 + x;
           } else {
-            yp = i * 20 + (10 - PIN_WIDTH / 2) + y;
+            yp = pinNr * 20 + (10 - PIN_WIDTH / 2) - 20 + y;
           }
         } else {
           if (horizontal) {
-            xp = (i - this.nrOfPins / 2) * 20 + (10 - PIN_WIDTH / 2) + x;
+            xp = (pinNr - this.nrOfPins / 2) * 20 + (10 - PIN_WIDTH / 2) - 20 + x;
             yp = height + y - PIN_HEIGHT;
           } else {
-            yp = (i - this.nrOfPins / 2) * 20 + (10 - PIN_WIDTH / 2) + y;
+            yp = (pinNr - this.nrOfPins / 2) * 20 + (10 - PIN_WIDTH / 2) - 20 + y;
             xp = width + x - PIN_HEIGHT;
           }
         }
@@ -450,6 +489,7 @@ public abstract class AbstractTtlGate extends InstanceFactory {
         GraphicsUtil.drawCenteredText(g, "Vcc", xp + 10, yp + PIN_HEIGHT + 4);
         GraphicsUtil.drawCenteredText(g, "GND", xp + width - 10, yp + height - PIN_HEIGHT - 10);
       }
+      */
     }
   }
 
