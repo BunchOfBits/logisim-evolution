@@ -44,7 +44,7 @@ public abstract class AbstractTtlGate extends InstanceFactory {
   private final String name;
   private byte numberOfGatesToDraw = 0;
   protected String[] portNames = null;
-  private final HashSet<Byte> outputPorts = new HashSet<>();
+  private final HashSet<Byte> outputPins = new HashSet<>();
   private final HashSet<Byte> unusedPins = new HashSet<>();
   private final HashSet<Byte> powerPins = new HashSet<>();
   private final HashSet<Byte> groundPins = new HashSet<>();
@@ -52,12 +52,12 @@ public abstract class AbstractTtlGate extends InstanceFactory {
   /**
    * @param name = name to display in the center of the TTl
    * @param pins = the total number of pins (GND and VCC included)
-   * @param outputPorts = an array with the indexes of the output ports (indexes are the same you
+   * @param outputPins = an array with the indexes of the output ports (indexes are the same you
    *     can find on Google searching the TTL you want to add)
    * @param generator = the HDL generator.
    * @param powerPins = an array with the indexes op the power pins (indexes are similar to outputPorts)
    */
-  protected AbstractTtlGate(String name, byte pins, byte[] outputPorts, byte[] powerPins, byte[] groundPins, HdlGeneratorFactory generator) {
+  protected AbstractTtlGate(String name, byte pins, byte[] outputPins, byte[] powerPins, byte[] groundPins, HdlGeneratorFactory generator) {
     super(name, generator);
     setIconName("ttl.gif");
     setAttributes(
@@ -69,8 +69,8 @@ public abstract class AbstractTtlGate extends InstanceFactory {
     this.name = name;
     this.nrOfPins = pins;
 
-    for (byte outputPort : outputPorts) {
-      this.outputPorts.add(outputPort);
+    for (byte pin : outputPins) {
+      this.outputPins.add(pin);
     }
 
     for (var pin : powerPins) {
@@ -85,21 +85,21 @@ public abstract class AbstractTtlGate extends InstanceFactory {
   /**
    * @param name = name to display in the center of the TTl
    * @param pins = the total number of pins (GND and VCC included)
-   * @param outputPorts = an array with the indexes of the output ports (indexes are the same you
+   * @param outputPins = an array with the indexes of the output ports (indexes are the same you
    *     can find on Google searching the TTL you want to add)
    */
-  protected AbstractTtlGate(String name, byte pins, byte[] outputPorts, HdlGeneratorFactory generator) {
+  protected AbstractTtlGate(String name, byte pins, byte[] outputPins, HdlGeneratorFactory generator) {
     // The bottom-right and top-left pins of TTL chips are usually their power pins.
-    this(name, pins, outputPorts, new byte[] { pins }, new byte[] { (byte) (pins / 2) }, generator);
+    this(name, pins, outputPins, new byte[] { pins }, new byte[] { (byte) (pins / 2) }, generator);
   }
 
   protected AbstractTtlGate(
       String name,
       byte pins,
-      byte[] outputPorts,
+      byte[] outputPins,
       byte[] notUsedPins,
       HdlGeneratorFactory generator) {
-    this(name, pins, outputPorts, generator);
+    this(name, pins, outputPins, generator);
     if (notUsedPins == null) return;
     for (byte notUsedPin : notUsedPins) unusedPins.add(notUsedPin);
   }
@@ -107,7 +107,7 @@ public abstract class AbstractTtlGate extends InstanceFactory {
   /**
    * @param name = name to display in the center of the TTl
    * @param pins = the total number of pins (GND and VCC included)
-   * @param outputPorts = an array with the indexes of the output ports (indexes are the same you
+   * @param outputPins = an array with the indexes of the output ports (indexes are the same you
    *     can find on Google searching the TTL you want to add)
    * @param drawgates = if true, it calls the paintInternal method many times as the number of
    *     output ports passing the coordinates
@@ -115,17 +115,17 @@ public abstract class AbstractTtlGate extends InstanceFactory {
   protected AbstractTtlGate(
       String name,
       byte pins,
-      byte[] outputPorts,
+      byte[] outputPins,
       boolean drawgates,
       HdlGeneratorFactory generator) {
-    this(name, pins, outputPorts, generator);
-    this.numberOfGatesToDraw = (byte) (drawgates ? outputPorts.length : 0);
+    this(name, pins, outputPins, generator);
+    this.numberOfGatesToDraw = (byte) (drawgates ? outputPins.length : 0);
   }
 
   /**
    * @param name = name to display in the center of the TTl
    * @param pins = the total number of pins (GND and VCC included)
-   * @param outputPorts = an array with the indexes of the output ports (indexes are the same you
+   * @param outputPins = an array with the indexes of the output ports (indexes are the same you
    *     can find on Google searching the TTL you want to add)
    * @param ttlPortNames = an array of strings which will be tooltips of the corresponding port in
    *     the order you pass
@@ -133,24 +133,24 @@ public abstract class AbstractTtlGate extends InstanceFactory {
   protected AbstractTtlGate(
       String name,
       byte pins,
-      byte[] outputPorts,
+      byte[] outputPins,
       String[] ttlPortNames,
       HdlGeneratorFactory generator) {
     // the ttl name, the total number of pins and an array with the indexes of
     // output ports (indexes are the one you can find on Google), an array of
     // strings which will be tooltips of the corresponding port in order
-    this(name, pins, outputPorts, generator);
+    this(name, pins, outputPins, generator);
     this.portNames = ttlPortNames;
   }
 
   protected AbstractTtlGate(
       String name,
       byte pins,
-      byte[] outputPorts,
+      byte[] outputPins,
       byte[] notUsedPins,
       String[] ttlPortNames,
       HdlGeneratorFactory generator) {
-    this(name, pins, outputPorts, generator);
+    this(name, pins, outputPins, generator);
     portNames = ttlPortNames;
     if (notUsedPins == null) return;
     for (final var notUsedPin : notUsedPins) unusedPins.add(notUsedPin);
@@ -159,14 +159,14 @@ public abstract class AbstractTtlGate extends InstanceFactory {
   protected AbstractTtlGate(
       String name,
       byte pins,
-      byte[] outputPorts,
+      byte[] outputPins,
       String[] ttlPortNames,
       int height,
       HdlGeneratorFactory generator) {
     // the ttl name, the total number of pins and an array with the indexes of
     // output ports (indexes are the one you can find on Google), an array of
     // strings which will be tooltips of the corresponding port in order
-    this(name, pins, outputPorts, generator);
+    this(name, pins, outputPins, generator);
     this.height = height;
     this.portNames = ttlPortNames;
   }
@@ -174,7 +174,7 @@ public abstract class AbstractTtlGate extends InstanceFactory {
   protected AbstractTtlGate(
           String name,
           byte pins,
-          byte[] outputPorts,
+          byte[] outputPins,
           byte[] powerPins,
           byte[] groundPins,
           String[] ttlPortNames,
@@ -183,7 +183,7 @@ public abstract class AbstractTtlGate extends InstanceFactory {
     // the ttl name, the total number of pins and an array with the indexes of
     // output ports (indexes are the one you can find on Google), an array of
     // strings which will be tooltips of the corresponding port in order
-    this(name, pins, outputPorts, powerPins, groundPins, generator);
+    this(name, pins, outputPins, powerPins, groundPins, generator);
     this.height = height;
     this.portNames = ttlPortNames;
   }
@@ -512,7 +512,7 @@ public abstract class AbstractTtlGate extends InstanceFactory {
       var port = 0;
       for (byte i = 1; i <= nrOfPins; i++) {
         if (!unusedPins.contains(i) && (i != (nrOfPins / 2))) {
-          if (outputPorts.contains(i)) state.setPort(port, Value.UNKNOWN, 1);
+          if (outputPins.contains(i)) state.setPort(port, Value.UNKNOWN, 1);
           port++;
         }
       }
@@ -538,51 +538,51 @@ public abstract class AbstractTtlGate extends InstanceFactory {
       names.addAll(Arrays.asList(portNames));
     }
 
-    for (byte portNr = 0; portNr < this.nrOfPins; portNr++) {
-      final var pinNr = (byte) (portNr + 1);
-
+    for (byte pinNr = 1; pinNr <= nrOfPins; pinNr++) {
       final var isUnused = unusedPins.contains(pinNr);
       final var isPower = powerPins.contains(pinNr);
       final var isGround = groundPins.contains(pinNr);
-      final var isOutput = outputPorts.contains(pinNr);
+      final var isOutput = outputPins.contains(pinNr);
       final var isInput = !isUnused && !isPower && !isGround && !isOutput;
 
-      final var isLowerRow = (portNr < this.nrOfPins / 2);
+      final var isLowerRow = (pinNr <= nrOfPins / 2);
       final var isUpperRow = !isLowerRow;
 
       var dx = 0;
       var dy = 0;
 
-      // set the position
+      // Set the position
       if (isLowerRow) {
         if (dir == Direction.EAST) {
-          dx = portNr * 20 + 10;
+          dx = pinNr * 20 - 10;
           dy = height - 30;
         } else if (dir == Direction.WEST) {
-          dx = -10 - 20 * portNr;
+          dx = 10 - 20 * pinNr;
           dy = 30 - height;
         } else if (dir == Direction.NORTH) {
           dx = width - 30;
-          dy = -10 - 20 * portNr;
-        } else { // SOUTH
+          dy = 10 - 20 * pinNr;
+        } else {
+          // SOUTH
           dx = 30 - width;
-          dy = portNr * 20 + 10;
+          dy = pinNr * 20 - 10;
         }
       }
 
       if (isUpperRow) {
         if (dir == Direction.EAST) {
-          dx = width - (portNr - this.nrOfPins / 2) * 20 - 10;
+          dx = width - (pinNr - nrOfPins / 2) * 20 + 10;
           dy = -30;
         } else if (dir == Direction.WEST) {
-          dx = -width + (portNr - this.nrOfPins / 2) * 20 + 10;
+          dx = -width + (pinNr - nrOfPins / 2) * 20 - 10;
           dy = 30;
         } else if (dir == Direction.NORTH) {
           dx = -30;
-          dy = -height + (portNr - this.nrOfPins / 2) * 20 + 10;
-        } else { // SOUTH
+          dy = -height + (pinNr - nrOfPins / 2) * 20 - 10;
+        } else {
+          // SOUTH
           dx = 30;
-          dy = height - (portNr - this.nrOfPins / 2) * 20 - 10;
+          dy = height - (pinNr - nrOfPins / 2) * 20 + 10;
         }
       }
 
@@ -631,10 +631,10 @@ public abstract class AbstractTtlGate extends InstanceFactory {
 
     /*
      * array port is composed in this order:
-     * - lower ports excluding power/ground pins and unused pins
-     * - upper ports excluding power/ground pins and unused pins
-     * - power pins
-     * - ground pins
+     * - lower ports excluding power/ground ports and unused ports
+     * - upper ports excluding power/ground ports and unused ports
+     * - power ports
+     * - ground ports
      */
     final var ports = new ArrayList<Port>();
 
