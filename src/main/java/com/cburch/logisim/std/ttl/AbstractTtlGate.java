@@ -215,71 +215,52 @@ public abstract class AbstractTtlGate extends InstanceFactory {
     final var dir = painter.getAttributeValue(StdAttr.FACING);
     final var g = (Graphics2D) painter.getGraphics();
     final var bds = painter.getBounds();
-    final var x = bds.getX();
-    final var y = bds.getY();
-    var xp = x;
-    var yp = y;
     var width = bds.getWidth();
     var height = bds.getHeight();
+
     if (!ghost) {
       g.setColor(new Color(AppPreferences.COMPONENT_COLOR.get()));
     }
-    for (byte i = 0; i < this.pinNumber; i++) {
-      if (i < this.pinNumber / 2) {
-        if (dir == Direction.WEST || dir == Direction.EAST) xp = i * 20 + (10 - PIN_WIDTH / 2) + x;
-        else yp = i * 20 + (10 - PIN_WIDTH / 2) + y;
-      } else {
-        if (dir == Direction.WEST || dir == Direction.EAST) {
-          xp = (i - this.pinNumber / 2) * 20 + (10 - PIN_WIDTH / 2) + x;
-          yp = height + y - PIN_HEIGHT;
-        } else {
-          yp = (i - this.pinNumber / 2) * 20 + (10 - PIN_WIDTH / 2) + y;
-          xp = width + x - PIN_HEIGHT;
-        }
-      }
-      if (dir == Direction.WEST || dir == Direction.EAST) {
-        // fill the background of white if selected from preferences
-        g.drawRect(xp, yp, PIN_WIDTH, PIN_HEIGHT);
-      } else {
-        // fill the background of white if selected from preferences
-        g.drawRect(xp, yp, PIN_HEIGHT, PIN_WIDTH);
-      }
-    }
-    if (dir == Direction.SOUTH) {
-      // fill the background of white if selected from preferences
-      g.drawRoundRect(x + PIN_HEIGHT, y, bds.getWidth() - PIN_HEIGHT * 2, bds.getHeight(), 10, 10);
-      g.drawArc(x + width / 2 - 7, y - 7, 14, 14, 180, 180);
-    } else if (dir == Direction.WEST) {
-      // fill the background of white if selected from preferences
-      g.drawRoundRect(x, y + PIN_HEIGHT, bds.getWidth(), bds.getHeight() - PIN_HEIGHT * 2, 10, 10);
-      g.drawArc(x + width - 7, y + height / 2 - 7, 14, 14, 90, 180);
-    } else if (dir == Direction.NORTH) {
-      // fill the background of white if selected from preferences
-      g.drawRoundRect(x + PIN_HEIGHT, y, bds.getWidth() - PIN_HEIGHT * 2, bds.getHeight(), 10, 10);
-      g.drawArc(x + width / 2 - 7, y + height - 7, 14, 14, 0, 180);
-    } else { // east
-      // fill the background of white if selected from preferences
-      g.drawRoundRect(x, y + PIN_HEIGHT, bds.getWidth(), bds.getHeight() - PIN_HEIGHT * 2, 10, 10);
-      g.drawArc(x - 7, y + height / 2 - 7, 14, 14, 270, 180);
-    }
-    g.rotate(Math.toRadians(-dir.toDegrees()), x + width / 2, y + height / 2);
-    if (drawname) {
-      g.setFont(new Font(Font.DIALOG_INPUT, Font.BOLD, 14));
-      GraphicsUtil.drawCenteredText(
-          g, this.name, x + bds.getWidth() / 2, y + bds.getHeight() / 2 - 4);
-    }
-    if (dir == Direction.WEST || dir == Direction.EAST) {
-      xp = x;
-      yp = y;
-    } else {
-      xp = x + (width - height) / 2;
-      yp = y + (height - width) / 2;
+
+    // Set orientation
+    g.rotate(Math.toRadians(-dir.toDegrees()));
+
+    if (dir == Direction.NORTH || dir == Direction.SOUTH) { // The bounds rotate with the orientation, so undo this
       width = bds.getHeight();
       height = bds.getWidth();
     }
+
+    // Draw pins
+    for (byte pin = 0; pin < this.pinNumber; pin++) {
+      int x, y;
+
+      if (pin < this.pinNumber / 2) {
+        x = pin * 20 + (10 - PIN_WIDTH / 2);
+        y = height / 2 - PIN_HEIGHT;
+      } else {
+        x = (pin - this.pinNumber / 2) * 20 + (10 - PIN_WIDTH / 2);
+        y = -height / 2;
+      }
+
+      g.drawRect(x, y, PIN_WIDTH, PIN_HEIGHT);
+    }
+
+    // Draw body
+    g.drawRoundRect(0, -height / 2 + PIN_HEIGHT, width, height - PIN_HEIGHT * 2, 10, 10);
+
+    // Draw pin 1 marker
+    g.drawArc(-7, - 7, 14, 14, 270, 180);
+
+    // Draw device name
+    if (drawname) {
+      g.setFont(new Font(Font.DIALOG_INPUT, Font.BOLD, 14));
+      GraphicsUtil.drawCenteredText(g, this.name, width / 2, -4);
+    }
+
+    // Draw Vcc and Gnd labels
     g.setFont(new Font(Font.DIALOG_INPUT, Font.BOLD, 7));
-    GraphicsUtil.drawCenteredText(g, "Vcc", xp + 10, yp + PIN_HEIGHT + 4);
-    GraphicsUtil.drawCenteredText(g, "GND", xp + width - 10, yp + height - PIN_HEIGHT - 7);
+    GraphicsUtil.drawCenteredText(g, "Vcc", 10, -height / 2 + PIN_HEIGHT + 4);
+    GraphicsUtil.drawCenteredText(g, "GND", width - 10, height / 2 - PIN_HEIGHT - 10);
   }
 
   @Override
