@@ -9,10 +9,11 @@
 
 package com.cburch.logisim.std.pld;
 
-import com.cburch.logisim.tools.FactoryDescription;
+import com.cburch.logisim.tools.AddTool;
 import com.cburch.logisim.tools.Library;
 import com.cburch.logisim.tools.Tool;
 
+import java.util.Arrays;
 import java.util.List;
 
 import static com.cburch.logisim.std.Strings.S;
@@ -20,11 +21,16 @@ import static com.cburch.logisim.std.Strings.S;
 public class PldLibrary extends Library {
   public static final String _ID = "PldLibrary";
 
-  private static final FactoryDescription[] DESCRIPTIONS = {
-      new FactoryDescription(Gal22V10.class, S.getter("GAL22V10")),
-  };
-
   private List<Tool> tools = null;
+
+  public PldLibrary()
+  {
+    tools =
+        Arrays.asList(
+            new Tool[]{
+                new AddTool(Gal22V10.FACTORY)
+            });
+  }
 
   @Override
   public String getDisplayName() {
@@ -33,10 +39,6 @@ public class PldLibrary extends Library {
 
   @Override
   public List<Tool> getTools() {
-    if (tools == null) {
-      tools = FactoryDescription.getTools(com.cburch.logisim.std.pld.PldLibrary.class, DESCRIPTIONS);
-    }
-
     return tools;
   }
 }
