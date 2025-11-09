@@ -10,6 +10,7 @@
 package com.cburch.logisim.std.pld;
 
 import com.cburch.logisim.data.*;
+import com.cburch.logisim.fpga.hdlgenerator.HdlGeneratorFactory;
 import com.cburch.logisim.gui.icons.ArithmeticIcon;
 import com.cburch.logisim.instance.*;
 import com.cburch.logisim.prefs.AppPreferences;
@@ -30,45 +31,243 @@ class Gal22V10 extends InstanceFactory {
    */
   public static final String _ID = "GAL22V10";
 
-  static final int IN0_CLK = 0;
-  static final int IN1 = 1;
-  static final int IN2 = 2;
-  static final int IN3 = 3;
-  static final int IN4 = 4;
-  static final int IN5 = 5;
-  static final int IN6 = 6;
-  static final int IN7 = 7;
-  static final int IN8 = 8;
-  static final int IN9 = 9;
-  static final int IN10 = 10;
-  static final int IN11 = 11;
+  private static class Factory {
+    static final int IN0_CLK = 0;
+    static final int IN1 = 1;
+    static final int IN2 = 2;
+    static final int IN3 = 3;
+    static final int IN4 = 4;
+    static final int IN5 = 5;
+    static final int IN6 = 6;
+    static final int IN7 = 7;
+    static final int IN8 = 8;
+    static final int IN9 = 9;
+    static final int IN10 = 10;
+    static final int IN11 = 11;
 
-  static final int IN_OUT0 = 12;
-  static final int IN_OUT1 = 13;
-  static final int IN_OUT2 = 14;
-  static final int IN_OUT3 = 15;
-  static final int IN_OUT4 = 16;
-  static final int IN_OUT5 = 17;
-  static final int IN_OUT6 = 18;
-  static final int IN_OUT7 = 19;
-  static final int IN_OUT8 = 20;
-  static final int IN_OUT9 = 21;
+    static final int IN_OUT0 = 12;
+    static final int IN_OUT1 = 13;
+    static final int IN_OUT2 = 14;
+    static final int IN_OUT3 = 15;
+    static final int IN_OUT4 = 16;
+    static final int IN_OUT5 = 17;
+    static final int IN_OUT6 = 18;
+    static final int IN_OUT7 = 19;
+    static final int IN_OUT8 = 20;
+    static final int IN_OUT9 = 21;
 
-  static final int[] inputs = new int[] {
-      IN0_CLK, IN1, IN2, IN3, IN4, IN5, IN6, IN7, IN8, IN9, IN10, IN11
-  };
+    private enum PinType {
+      Input,
+      InOut,
+      None
+    }
 
-  static final int[] inout = new int[] {
-      IN_OUT0, IN_OUT1, IN_OUT2, IN_OUT3, IN_OUT4, IN_OUT5, IN_OUT6, IN_OUT7,  IN_OUT8, IN_OUT9
-  };
+    private static PinType getPinType(int pin) {
+      if (IN0_CLK <= pin && pin <= IN11) {
+        return PinType.Input;
+      } else if (IN_OUT0 <= pin && pin <= IN_OUT9) {
+        return PinType.InOut;
+      } else {
+        return PinType.None;
+      }
+    }
+
+    private static Point getPoint(int pin) {
+      return switch (getPinType(pin)) {
+        case Input -> new Point(0, pin * 20);
+        case InOut -> new Point(100, (pin - IN_OUT0) * 20);
+        default -> null;
+      };
+    }
+
+    public static PortModel createPortModel(int pin) {
+      var pinType = getPinType(pin);
+      var point = getPoint(pin);
+
+      if (pinType == PinType.None || point == null) {
+        return null;
+      }
+
+      var model = new PortModel();
+
+      model.port = new Port(point.x, point.y, pinType == PinType.Input ? Port.INPUT : Port.INOUT, BitWidth.ONE);
+      model.pin = pin;
+
+      return model;
+    }
+
+    public static PortViewModel createPortViewModel(PortModel model) {
+      var pinType = getPinType(model.pin);
+      var point = getPoint(model.pin);
+
+      if (pinType == PinType.None || point == null) {
+        return null;
+      }
+
+      var viewModel = new PortViewModel();
+
+      viewModel.model = model;
+      viewModel.dx = point.x;
+      viewModel.dy = point.y;
+
+      switch (pinType) {
+        case Input:
+          viewModel.alignment = GraphicsUtil.H_LEFT;
+          viewModel.name = String.format("I %02d", model.pin);
+          break;
+        case InOut:
+          viewModel.alignment = GraphicsUtil.H_RIGHT;
+          viewModel.name = String.format("I/O %02d", model.pin);
+          break;
+      }
+
+      viewModel.portNr = model.pin;
+
+      return viewModel;
+    }
+  }
+
+  private static class PortModel {
+    public Port port;
+    public int pin;
+  }
+
+  private static class Gal22V10Model implements InstanceData {
+    public PortModel[] portModels = new PortModel[] {
+        Factory.createPortModel(Factory.IN0_CLK),
+        Factory.createPortModel(Factory.IN1),
+        Factory.createPortModel(Factory.IN2),
+        Factory.createPortModel(Factory.IN3),
+        Factory.createPortModel(Factory.IN4),
+        Factory.createPortModel(Factory.IN5),
+        Factory.createPortModel(Factory.IN6),
+        Factory.createPortModel(Factory.IN7),
+        Factory.createPortModel(Factory.IN8),
+        Factory.createPortModel(Factory.IN9),
+        Factory.createPortModel(Factory.IN10),
+        Factory.createPortModel(Factory.IN11),
+
+        Factory.createPortModel(Factory.IN_OUT0),
+        Factory.createPortModel(Factory.IN_OUT1),
+        Factory.createPortModel(Factory.IN_OUT2),
+        Factory.createPortModel(Factory.IN_OUT3),
+        Factory.createPortModel(Factory.IN_OUT4),
+        Factory.createPortModel(Factory.IN_OUT5),
+        Factory.createPortModel(Factory.IN_OUT6),
+        Factory.createPortModel(Factory.IN_OUT7),
+        Factory.createPortModel(Factory.IN_OUT8),
+        Factory.createPortModel(Factory.IN_OUT9),
+    };
+
+    public FuseMap fuseMap;
+
+    public void propagate(InstanceState state) {
+      Value[] inputs = state.getPortValue(0).getAll();
+
+      for (byte i = 0; i < inputs.length / 2; i++) { // reverse array
+        Value temp = inputs[i];
+
+        inputs[i] = inputs[inputs.length - i - 1];
+        inputs[inputs.length - i - 1] = temp;
+      }
+    }
+
+    @Override
+    public Object clone() {
+      try {
+        return super.clone();
+      } catch (CloneNotSupportedException e) {
+        return null;
+      }
+    }
+  }
+
+  private static class PortViewModel {
+    public PortModel model;
+    public int dx;
+    public int dy;
+    public int alignment;
+    public String name;
+    public int portNr;
+
+    public void drawPort(InstancePainter painter, PortViewModel pvm) {
+      final var g = painter.getGraphics();
+      final var bds = painter.getBounds();
+      final var x = bds.getX();
+      final var y = bds.getY();
+      final var left = pvm.alignment == GraphicsUtil.H_LEFT;
+
+      GraphicsUtil.drawText(g, pvm.name, x + pvm.dx + (left ? 3 : -3), y + pvm.dy + 10, pvm.alignment, GraphicsUtil.V_CENTER_OVERALL);
+    }
+  }
+
+  private static class Gal22V10ViewModel {
+    private final String name = S.getter("GAL22V10Component").toString();
+    private final Gal22V10Model model;
+
+    public PortViewModel[] portViewModels;
+
+    public Gal22V10ViewModel(Gal22V10Model model) {
+      this.model = model;
+
+      portViewModels = Arrays
+        .stream(model.portModels)
+        .map(Factory::createPortViewModel)
+        .toArray(PortViewModel[]::new);
+    }
+
+    public void paintInstance(InstancePainter painter, boolean ghost) {
+      final var g = painter.getGraphics();
+      final var bds = painter.getBounds();
+      final var x = bds.getX();
+      final var y = bds.getY();
+      final var w = bds.getWidth();
+      final var h = bds.getHeight();
+
+      if (!ghost) {
+        g.setColor(new Color(AppPreferences.COMPONENT_COLOR.get()));
+      }
+
+      GraphicsUtil.switchToWidth(g, 2);
+      g.drawRect(x, y, w, h);
+      drawLabel(painter, x + w / 2, y - 12);
+
+      for (PortViewModel portViewModel : portViewModels) {
+        portViewModel.drawPort(painter, portViewModel);
+      }
+
+      if (ghost) {
+        return;
+      }
+
+      for (PortViewModel pvm : portViewModels) {
+        painter.drawPort(pvm.portNr);
+      }
+    }
+
+    private void drawLabel(InstancePainter painter, int x, int y) {
+      final var g = painter.getGraphics();
+      final var label = painter.getAttributeValue(StdAttr.LABEL);
+
+      g.setFont(painter.getAttributeValue(StdAttr.LABEL_FONT));
+
+      if (label == null || label.isEmpty()) {
+        GraphicsUtil.drawCenteredText(g, name, x, y);
+      }
+    }
+  }
+
+  private final Gal22V10ViewModel viewModel;
 
   static final Attribute<FuseMap> ATTR_FUSE_MAP = new FuseMapAttribute();
 
   public static final InstanceFactory FACTORY = new Gal22V10();
 
   public Gal22V10() {
-    super(_ID, S.getter("GAL22V10Component"));  // TODO: Add HDL generator and global clock
+    super(_ID, (HdlGeneratorFactory) null);  // TODO: Add HDL generator and global clock
     setIcon(new ArithmeticIcon("PLD", 3));
+    setOffsetBounds(Bounds.create(0, -10, 100, 240));
+    viewModel =  new Gal22V10ViewModel(new Gal22V10Model());
   }
 
   @Override
@@ -81,32 +280,6 @@ class Gal22V10 extends InstanceFactory {
     super.configureNewInstance(instance);
     instance.addAttributeListener();
     updatePorts(instance);
-
-    Bounds bds = instance.getBounds();
-
-    instance.setTextField(
-        StdAttr.LABEL,
-        StdAttr.LABEL_FONT,
-        bds.getX() + bds.getWidth() / 2,
-        bds.getY() + bds.getHeight() / 3,
-        GraphicsUtil.H_CENTER,
-        GraphicsUtil.V_CENTER_OVERALL);
-  }
-
-  private void updatePorts(Instance instance) {
-    Port[] ports = new Port[22];
-
-    for (var i = 0; i < inputs.length; i++) {
-      ports[i] = new Port(0, i * 50, Port.INPUT, BitWidth.ONE);
-      ports[i].setToolTip(S.getter("input"));
-    }
-
-    for (var i = 0; i < inout.length; i++) {
-      ports[i] = new Port(50, i * 50, Port.INOUT, BitWidth.ONE);
-      ports[i].setToolTip(S.getter("inout"));
-    }
-
-    instance.setPorts(ports);
   }
 
   @Override
@@ -122,52 +295,34 @@ class Gal22V10 extends InstanceFactory {
 
   @Override
   public void propagate(InstanceState state) {
-    FuseMap data = getFuseMap(state);
-    Value[] inputs = state.getPortValue(0).getAll();
+    Gal22V10Model model = (Gal22V10Model) state.getData();
 
-    for (byte i = 0; i < inputs.length / 2; i++) { // reverse array
-      Value temp = inputs[i];
-
-      inputs[i] = inputs[inputs.length - i - 1];
-      inputs[inputs.length - i - 1] = temp;
+    if (model == null) {
+      model = new Gal22V10Model();
+      // if new, fill the content with the saved data
+      state.setData(model);
     }
 
-    // data.setInputsValue(inputs);
-    // state.setPort(1, Value.create(data.getOutputValues()), Mem.DELAY);
+    model.propagate(state);
+  }
+
+  @Override
+  public void paintGhost(InstancePainter painter) {
+    viewModel.paintInstance(painter, true);
   }
 
   @Override
   public void paintInstance(InstancePainter painter) {
-    Graphics g = painter.getGraphics();
-
-    g.setColor(new Color(AppPreferences.COMPONENT_COLOR.get()));
-    painter.drawRoundBounds(Color.WHITE);
-
-    Bounds bds = painter.getBounds();
-
-    g.setFont(new Font("sans serif", Font.BOLD, 11));
-
-    Object label = painter.getAttributeValue(StdAttr.LABEL);
-
-    if (label == null || label.equals("")) {
-      GraphicsUtil.drawCenteredText(
-          g, "GAL22V10", bds.getX() + bds.getWidth() / 2, bds.getY() + bds.getHeight() / 3);
-    }
-
-    painter.drawPort(0);
-    painter.drawPort(1);
-    painter.drawLabel();
+    viewModel.paintInstance(painter, false);
   }
 
-  private static FuseMap getFuseMap(InstanceState state) {
-    FuseMap fuseMap = (FuseMap) state.getData();
+  private void updatePorts(Instance instance) {
+    var ports = Arrays
+      .stream(viewModel.portViewModels)
+      .map(p -> p.model.port)
+      .toArray(Port[]::new);
 
-    if (fuseMap == null) {
-      fuseMap = new FuseMap();
-      // if new, fill the content with the saved data
-      state.setData(fuseMap);
-    }
-    return fuseMap;
+    instance.setPorts(ports);
   }
 
   private static class FuseMapAttribute extends Attribute<FuseMap> {
