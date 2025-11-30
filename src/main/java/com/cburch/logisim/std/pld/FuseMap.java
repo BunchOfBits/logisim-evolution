@@ -1,27 +1,24 @@
 package com.cburch.logisim.std.pld;
 
+import java.util.stream.IntStream;
+
 /**
  * PLD Fuse map.
  */
-public class FuseMap {
-  public static final FuseMap EMPTY = new FuseMap();
+public class FuseMap implements Cloneable {
+  protected int[] andPlane;
+  protected int[][] orPlane;
+  protected final boolean[] map;
 
-  /**
-   * Deserializes a fuse map from the circuit file format.
-   *
-   * @param str The circuit file representation of the fuse map.
-   * @return A parsed fuse map.
-   */
-  public static FuseMap parse(String str) {
-    return new FuseMap();
+  protected FuseMap(boolean[] map) {
+    this.map = map;
   }
 
-  /**
-   * Serializes a fuse map to the circuit file format.
-   *
-   * @return The serialized fuse map.
-   */
-  public String toStandardString() {
-    return "";
+  protected int toPattern(int begin, int size) {
+    return IntStream
+        .range(begin, begin + size)
+        .filter(fuse -> map[fuse])
+        .map(fuse -> 1 << (fuse - begin))
+        .sum();
   }
 }
