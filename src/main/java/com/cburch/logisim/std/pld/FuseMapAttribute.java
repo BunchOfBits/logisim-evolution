@@ -2,9 +2,12 @@ package com.cburch.logisim.std.pld;
 
 import com.cburch.logisim.data.Attribute;
 
+import javax.swing.*;
+import java.awt.*;
+
 import static com.cburch.logisim.std.Strings.S;
 
-class FuseMapAttribute extends Attribute<Gal22V10FuseMap> {
+public class FuseMapAttribute extends Attribute<Gal22V10FuseMap> {
   public FuseMapAttribute() {
     super("map", S.getter("fuseMap"));
   }
@@ -22,5 +25,14 @@ class FuseMapAttribute extends Attribute<Gal22V10FuseMap> {
   @Override
   public Gal22V10FuseMap parse(String str) {
     return Gal22V10FuseMap.parse(str);
+  }
+
+  @Override
+  public Component getCellEditor(Window source, Gal22V10FuseMap fuseMap) {
+    var editor = new FuseMapCellEditor((Frame)source);
+
+    editor.setValue(fuseMap);
+
+    return editor;
   }
 }

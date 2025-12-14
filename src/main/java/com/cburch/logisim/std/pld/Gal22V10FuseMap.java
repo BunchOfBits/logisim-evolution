@@ -1,5 +1,6 @@
 package com.cburch.logisim.std.pld;
 
+import java.io.File;
 import java.util.Arrays;
 import java.util.stream.IntStream;
 
@@ -96,6 +97,13 @@ public class Gal22V10FuseMap extends FuseMap {
     }
 
     return new Gal22V10FuseMap(map);
+  }
+
+  public static Gal22V10FuseMap parse(File file) {
+    return new Gal22V10FuseMap();
+  }
+
+  public void copyFrom(Gal22V10FuseMap other) {
   }
 
   /**
