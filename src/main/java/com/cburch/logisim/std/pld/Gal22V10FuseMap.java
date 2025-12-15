@@ -104,6 +104,7 @@ public class Gal22V10FuseMap extends FuseMap {
   }
 
   public void copyFrom(Gal22V10FuseMap other) {
+    System.arraycopy(other.map, 0, map, 0, map.length);
   }
 
   /**
