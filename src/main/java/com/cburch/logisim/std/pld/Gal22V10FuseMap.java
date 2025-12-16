@@ -100,7 +100,9 @@ public class Gal22V10FuseMap extends FuseMap {
   }
 
   public static Gal22V10FuseMap parse(File file) {
-    return new Gal22V10FuseMap();
+    var jedec = JedecFile.load(file);
+
+    return new Gal22V10FuseMap(jedec.getFuseMap());
   }
 
   public void copyFrom(Gal22V10FuseMap other) {
