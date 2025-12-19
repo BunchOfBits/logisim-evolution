@@ -7,18 +7,18 @@ import java.awt.*;
 
 import static com.cburch.logisim.std.Strings.S;
 
-public class FuseMapAttribute extends Attribute<Gal22V10FuseMap> {
+public class FuseMapAttribute extends Attribute<FuseMap> {
   public FuseMapAttribute() {
     super("map", S.getter("fuseMap"));
   }
 
   @Override
-  public String toDisplayString(Gal22V10FuseMap value) {
+  public String toDisplayString(FuseMap value) {
     return S.get("pldClickToEdit");
   }
 
   @Override
-  public String toStandardString(Gal22V10FuseMap fuseMap) {
+  public String toStandardString(FuseMap fuseMap) {
     return fuseMap.toStandardString();
   }
 
@@ -28,7 +28,7 @@ public class FuseMapAttribute extends Attribute<Gal22V10FuseMap> {
   }
 
   @Override
-  public Component getCellEditor(Window source, Gal22V10FuseMap fuseMap) {
+  public Component getCellEditor(Window source, FuseMap fuseMap) {
     var editor = new FuseMapCellEditor((Frame)source);
 
     editor.setValue(fuseMap);

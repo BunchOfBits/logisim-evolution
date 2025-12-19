@@ -84,5 +84,5 @@ public abstract class FuseMap implements Cloneable {
     System.arraycopy(other, 0, map, 0, map.length);
   }
 
-  protected abstract Object clone() throws CloneNotSupportedException;
+  protected abstract Object clone();
 }

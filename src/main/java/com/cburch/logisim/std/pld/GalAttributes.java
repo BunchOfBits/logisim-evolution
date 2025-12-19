@@ -10,11 +10,11 @@ import java.util.Arrays;
 import java.util.List;
 
 class GalAttributes extends AbstractAttributeSet {
-  public static final Attribute<Gal22V10FuseMap> ATTR_FUSEMAP = new FuseMapAttribute();
+  public static final Attribute<FuseMap> ATTR_FUSEMAP = new FuseMapAttribute();
   private String label = "";
   private Object labelLoc = Direction.NORTH;
   private Font labelFont = StdAttr.DEFAULT_LABEL_FONT;
-  private Gal22V10FuseMap fuseMap = new Gal22V10FuseMap();
+  private FuseMap fuseMap;
 
   private static final java.util.List<Attribute<?>> attributes =
       Arrays.asList(
@@ -23,11 +23,15 @@ class GalAttributes extends AbstractAttributeSet {
           StdAttr.LABEL_LOC,
           StdAttr.LABEL_FONT);
 
+  public GalAttributes(FuseMap fuseMap) {
+    this.fuseMap = fuseMap;
+  }
+
   @Override
   protected void copyInto(AbstractAttributeSet destObj) {
     GalAttributes dest = (GalAttributes) destObj;
 
-    dest.fuseMap = (Gal22V10FuseMap) fuseMap.clone();
+    dest.fuseMap = (FuseMap)fuseMap.clone();
     dest.label = this.label;
     dest.labelLoc = this.labelLoc;
     dest.labelFont = this.labelFont;
@@ -63,7 +67,7 @@ class GalAttributes extends AbstractAttributeSet {
     } else if (attr == StdAttr.LABEL_FONT) {
       labelFont = (Font) value;
     } else if (attr == ATTR_FUSEMAP) {
-      fuseMap = (Gal22V10FuseMap) value;
+      fuseMap = (FuseMap) value;
     }
 
     fireAttributeValueChanged(attr, value, null);

@@ -41,7 +41,7 @@ class Gal22V10Factory extends InstanceFactory {
 
   @Override
   public AttributeSet createAttributeSet() {
-    return new GalAttributes();
+    return new GalAttributes(new Gal22V10FuseMap());
   }
 
   @Override
@@ -58,7 +58,7 @@ class Gal22V10Factory extends InstanceFactory {
     super.configureNewInstance(instance);
     final var attributes = (GalAttributes) instance.getAttributeSet();
 
-    attributes.setValue(GalAttributes.ATTR_FUSEMAP, new Gal22V10FuseMap(instance.getAttributeValue(GalAttributes.ATTR_FUSEMAP)));
+    attributes.setValue(GalAttributes.ATTR_FUSEMAP, new Gal22V10FuseMap(instance.getAttributeValue(GalAttributes.ATTR_FUSEMAP).map));
     instance.addAttributeListener();
     updatePorts(instance);
   }
