@@ -9,7 +9,7 @@ import javax.swing.filechooser.FileNameExtensionFilter;
 public class FuseMapCellEditor extends JDialog implements JInputDialog {
   static private String mruPath;
   private final JFileChooser fileChooser;
-  private Gal22V10FuseMap fuseMap;
+  private FuseMap fuseMap;
 
   public FuseMapCellEditor(Frame parent) {
     super(parent, true);
@@ -21,7 +21,7 @@ public class FuseMapCellEditor extends JDialog implements JInputDialog {
         var file = fileChooser.getSelectedFile();
 
         mruPath = file.getParentFile().getAbsolutePath();
-        fuseMap.copyFrom(Gal22V10FuseMap.parse(file));
+        fuseMap.copyFrom(FuseMap.parseFrom(file));
       }
 
       // Close the dialog and allow the table to update
@@ -40,8 +40,8 @@ public class FuseMapCellEditor extends JDialog implements JInputDialog {
 
   @Override
   public void setValue(Object value) {
-    if (!(value instanceof Gal22V10FuseMap other)) { return; }
+    if (fuseMap != null && value.getClass() != fuseMap.getClass()) { return; }
 
-    fuseMap = other;
+    fuseMap = (FuseMap)value;
   }
 }

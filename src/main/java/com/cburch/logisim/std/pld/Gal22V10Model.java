@@ -53,7 +53,8 @@ public class Gal22V10Model {
    * @param state the instance state.
    */
   public void propagate(InstanceState state) {
-    Value[] inputs = state.getPortValue(0).getAll();
+    var inputs = state.getPortValue(0).getAll();
+    var map = state.getAttributeValue(GalAttributes.ATTR_FUSEMAP);
 
     for (byte i = 0; i < inputs.length / 2; i++) { // reverse array
       Value temp = inputs[i];
