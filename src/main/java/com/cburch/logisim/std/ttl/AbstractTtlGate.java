@@ -46,8 +46,8 @@ public abstract class AbstractTtlGate extends InstanceFactory {
   private final HashSet<Byte> outputPorts = new HashSet<>();
   private final HashSet<Byte> inoutPorts = new HashSet<>();
   private final HashSet<Byte> unusedPins = new HashSet<>();
-  private final byte vccPin;
-  private final byte gndPin;
+  private final HashSet<Byte> vccPins = new HashSet<>();
+  private final HashSet<Byte> gndPins = new HashSet<>();
 
   /**
    * @param name         name to display in the center of the TTl
@@ -74,8 +74,8 @@ public abstract class AbstractTtlGate extends InstanceFactory {
         ttlPortNames,
         drawGates,
         height,
-        pins,
-        (byte) (pins / 2),
+        new byte[]{pins},
+        new byte[]{(byte) (pins / 2)},
         generator);
   }
 
@@ -94,12 +94,22 @@ public abstract class AbstractTtlGate extends InstanceFactory {
       String[] ttlPortNames,
       boolean drawGates,
       int height,
-      byte vccPin,
-      byte gndPin,
+      byte[] vccPins,
+      byte[] gndPins,
       HdlGeneratorFactory generator) {
     super(name, generator);
-    if (vccPin < 1 || vccPin > pins || gndPin < 1 || gndPin > pins || vccPin == gndPin) {
-      throw new IllegalArgumentException("Invalid TTL power pin mapping");
+    for(byte vccPin : vccPins)
+    {
+      if (vccPin < 1 || vccPin > pins) {
+        throw new IllegalArgumentException("Invalid TTL power pin mapping");
+      }
+
+      for(byte gndPin : gndPins)
+      {
+        if (gndPin < 1 || gndPin > pins || vccPin == gndPin) {
+          throw new IllegalArgumentException("Invalid TTL power pin mapping");
+        }
+      }
     }
     setIconName("ttl.gif");
     setAttributes(
@@ -109,8 +119,12 @@ public abstract class AbstractTtlGate extends InstanceFactory {
     setFacingAttribute(StdAttr.FACING);
     this.name = name;
     this.pinNumber = pins;
-    this.vccPin = vccPin;
-    this.gndPin = gndPin;
+    for (var vccPin : vccPins) {
+      this.vccPins.add(vccPin);
+    }
+    for (var gndPin : gndPins) {
+      this.gndPins.add(gndPin);
+    }
     if (outputPorts != null) {
       for (final var outPort : outputPorts) {
         this.outputPorts.add(outPort);
@@ -131,7 +145,7 @@ public abstract class AbstractTtlGate extends InstanceFactory {
     this.height = height;
   }
 
-  /** See {@link #AbstractTtlGate(String, byte, byte[], byte[], byte[], String[], boolean, int, byte, byte,
+  /** See {@link #AbstractTtlGate(String, byte, byte[], byte[], byte[], String[], boolean, int, byte[], byte[],
    * HdlGeneratorFactory)}. */
   protected AbstractTtlGate(
       String name,
@@ -151,8 +165,8 @@ public abstract class AbstractTtlGate extends InstanceFactory {
         ttlPortNames,
         false,
         DEFAULT_HEIGHT,
-        vccPin,
-        gndPin,
+        new byte[]{vccPin},
+        new byte[]{gndPin},
         generator);
   }
 
@@ -450,10 +464,14 @@ public abstract class AbstractTtlGate extends InstanceFactory {
       int lowerInset,
       int upperXOffset,
       int lowerXOffset) {
-    drawPowerPinLabel(
-        g, "Vcc", vccPin, x, y, width, height, upperOffset, lowerInset, upperXOffset, lowerXOffset);
-    drawPowerPinLabel(
-        g, "GND", gndPin, x, y, width, height, upperOffset, lowerInset, upperXOffset, lowerXOffset);
+    for (var vccPin : vccPins) {
+      drawPowerPinLabel(
+          g, "Vcc", vccPin, x, y, width, height, upperOffset, lowerInset, upperXOffset, lowerXOffset);
+    }
+    for (var gndPin : gndPins) {
+      drawPowerPinLabel(
+          g, "GND", gndPin, x, y, width, height, upperOffset, lowerInset, upperXOffset, lowerXOffset);
+    }
   }
 
   private void drawPowerPinLabel(
@@ -533,7 +551,7 @@ public abstract class AbstractTtlGate extends InstanceFactory {
             || state.getPortValue(powerPortIndex + 1) != Value.TRUE)) {
       var port = 0;
       for (byte i = 1; i <= pinNumber; i++) {
-        if (unusedPins.contains(i) || i == gndPin || i == vccPin) continue;
+        if (unusedPins.contains(i) || gndPins.contains(i) || vccPins.contains(i)) continue;
         if (outputPorts.contains(i)) state.setPort(port, Value.UNKNOWN, 1);
         port++;
       }
@@ -599,16 +617,16 @@ public abstract class AbstractTtlGate extends InstanceFactory {
       // Set the port (output/input)
       if (unusedPins.contains(physicalPin)) {
         continue;
-      } else if (physicalPin == gndPin) {
+      } else if (gndPins.contains(physicalPin)) {
         if (hasvccgnd) {
           ps[ps.length - 2] = new Port(dx, dy, Port.INPUT, 1);
-          ps[ps.length - 2].setToolTip(S.getter("GNDPin", Byte.toString(gndPin)));
+          ps[ps.length - 2].setToolTip(S.getter("GNDPin", Byte.toString(physicalPin)));
         }
         continue;
-      } else if (physicalPin == vccPin) {
+      } else if (vccPins.contains(physicalPin)) {
         if (hasvccgnd) {
           ps[ps.length - 1] = new Port(dx, dy, Port.INPUT, 1);
-          ps[ps.length - 1].setToolTip(S.getter("VCCPin", Byte.toString(vccPin)));
+          ps[ps.length - 1].setToolTip(S.getter("VCCPin", Byte.toString(physicalPin)));
         }
         continue;
       } else if (isoutput) { // output port
