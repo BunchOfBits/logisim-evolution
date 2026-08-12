@@ -16,7 +16,6 @@ import com.cburch.logisim.instance.InstanceState;
 import com.cburch.logisim.instance.StdAttr;
 import com.cburch.logisim.std.ttl.AbstractTtlGate;
 import com.cburch.logisim.std.ttl.TtlRegisterData;
-import org.apache.commons.lang3.tuple.ImmutablePair;
 
 /**
  * Am2901: 4-bit microprocessor slice
@@ -90,6 +89,7 @@ public class Am2901 extends AbstractTtlGate {
   public static final byte VCC = 10;
   public static final byte GND = 30;
 
+  // Pin groups
   private static final Byte[] A_INPUTS = new Byte[] { A0, A1, A2, A3 };
   private static final Byte[] B_INPUTS = new Byte[] { B0, B1, B2, B3 };
   private static final Byte[] D_INPUTS = new Byte[] { D0, D1, D2, D3 };
@@ -97,70 +97,48 @@ public class Am2901 extends AbstractTtlGate {
   private static final Byte[] ALU_DEST = new Byte[] { I6, I7, I8 };
   private static final Byte[] ALU_FUNC = new Byte[] { I3, I4, I5 };
   private static final Byte[] Y_OUTPUTS = new Byte[] { Y0, Y1, Y2, Y3 };
-  private static final Byte[] TTL_OUTPUTS = new Byte[] { Pn, Gn, C4, OVR, F3, ZERO };
-  private static final Byte[] SHIFT_OUTPUTS = new Byte[] { RAM0, RAM3, Q0, Q3 };
 
+  // Common data values
   private static final BitWidth REGISTER_WIDTH = BitWidth.create(4);
   private static final Value ZERO_DATA = Value.createKnown(REGISTER_WIDTH, 0);
   private static final Value UNKNOWN_DATA = Value.createUnknown(REGISTER_WIDTH);
   private static final Value ERROR_DATA = Value.createError(REGISTER_WIDTH);
 
+  // TtlRegisterData structure
   private static final int NR_OF_REG = 16 + 2 + 1;
   private static final int A_REG_IX = 16;
   private static final int B_REG_IX = 17;
   private static final int Q_REG_IX = 18;
 
   // ALU source operand microcode (see datasheet for names and meaning)
-  private static final Value AQ = Value.createKnown(3, 0);
-  private static final Value AB = Value.createKnown(3, 1);
-  private static final Value ZQ = Value.createKnown(3, 2);
-  private static final Value ZB = Value.createKnown(3, 3);
-  private static final Value ZA = Value.createKnown(3, 4);
-  private static final Value DA = Value.createKnown(3, 5);
-  private static final Value DQ = Value.createKnown(3, 6);
-  private static final Value DZ = Value.createKnown(3, 7);
+  private static final int AQ = 0;
+  private static final int AB = 1;
+  private static final int ZQ = 2;
+  private static final int ZB = 3;
+  private static final int ZA = 4;
+  private static final int DA = 5;
+  private static final int DQ = 6;
+  private static final int DZ = 7;
 
   // ALU function microcode (see datasheet for names and meaning)
-  private static final Value ADD = Value.createKnown(3, 0);
-  private static final Value SUBR = Value.createKnown(3, 1);
-  private static final Value SUBS = Value.createKnown(3, 2);
-  private static final Value OR = Value.createKnown(3, 3);
-  private static final Value AND = Value.createKnown(3, 4);
-  private static final Value NOTRS = Value.createKnown(3, 5);
-  private static final Value EXOR = Value.createKnown(3, 6);
-  private static final Value EXNOR = Value.createKnown(3, 7);
+  private static final int ADD = 0;
+  private static final int SUBR = 1;
+  private static final int SUBS = 2;
+  private static final int OR = 3;
+  private static final int AND = 4;
+  private static final int NOTRS = 5;
+  private static final int EXOR = 6;
+  private static final int EXNOR = 7;
 
   // ALU destination microcode (see datasheet for names and meaning)
-  private static final Value QREG = Value.createKnown(3, 0);
-  private static final Value NOP = Value.createKnown(3, 1);
-  private static final Value RAMA = Value.createKnown(3, 2);
-  private static final Value RAMF = Value.createKnown(3, 3);
-  private static final Value RAMQD = Value.createKnown(3, 4);
-  private static final Value RAMD = Value.createKnown(3, 5);
-  private static final Value RAMQU = Value.createKnown(3, 6);
-  private static final Value RAMU = Value.createKnown(3, 7);
-
-  private static class AluResult {
-    public Value f;         // ALU output
-    public Value pn;        // Pn
-    public Value gn;        // Gn
-    public Value carryOut;  // Cn+4
-    public Value overflow;  // OVR
-    public Value zero;      // F = 0
-
-    private AluResult(Value f, Value pn, Value gn, Value carryOut, Value overflow, Value zero) {
-      this.f = f;
-      this.pn = pn;
-      this.gn = gn;
-      this.carryOut = carryOut;
-      this.overflow = overflow;
-      this.zero = zero;
-    }
-
-    public static final AluResult ERROR = new AluResult(ERROR_DATA, Value.ERROR, Value.ERROR, Value.ERROR, Value.ERROR, Value.ERROR);
-
-    public static final AluResult UNKNOWN = new AluResult(UNKNOWN_DATA, Value.UNKNOWN, Value.UNKNOWN, Value.UNKNOWN, Value.UNKNOWN, Value.UNKNOWN);
-  }
+  private static final int QREG = 0;
+  private static final int NOP = 1;
+  private static final int RAMA = 2;
+  private static final int RAMF = 3;
+  private static final int RAMQD = 4;
+  private static final int RAMD = 5;
+  private static final int RAMQU = 6;
+  private static final int RAMU = 7;
 
   public Am2901() {
     super(
@@ -229,8 +207,7 @@ public class Am2901 extends AbstractTtlGate {
     private Value getPort(Byte[] pins) {
       var value = Value.createKnown(pins.length, 0);
 
-      for (var i = 0; i < pins.length; i++)
-      {
+      for (var i = 0; i < pins.length; i++) {
         var pin = getPort(pins[i]);
 
         value = value.set(i, pin.isFullyDefined() ? pin : Value.UNKNOWN);
@@ -336,443 +313,6 @@ public class Am2901 extends AbstractTtlGate {
       return data;
     }
 
-    /**
-     * Set the ALU flags for the arithmetic microcodes: "ADD", "SUB" and "SUBS".
-     *
-     * @param result the ALU result.
-     * @param p      the "propagate" output from the ALU.
-     * @param g      the "generate" output from the ALU.
-     */
-    private void setArithmeticFlags(AluResult result, Value p, Value g) {
-      final var c0 = getPort(C0); // Already validated
-      final var c1 = g.get(0).or(p.get(0).and(c0)); // C1 = G0 + P0C0
-      final var c2 = g.get(1).or(p.get(1).and(c1)); // C2 = G1 + P1C1
-      final var c3 = g.get(2).or(p.get(2).and(c2)); // C3 = G2 + P2C2
-      final var c4 = g.get(3).or(p.get(3).and(c3)); // C4 = G3 + P3C3
-
-      // Z = /(F3 + F2 + F1 + F0)
-      result.zero = result.f.get(3)
-          .or(result.f.get(2))
-          .or(result.f.get(1))
-          .or(result.f.get(0))
-          .not();
-      // Pn = /(P3P2P1P0)
-      result.pn = p.get(3)
-          .and(p.get(2))
-          .and(p.get(1))
-          .and(p.get(0))
-          .not();
-      // Gn = /(G3 + P3G2 + P3P2G1 + P3P2P1G0)
-      //    = /(G3 + P3(G2 + P2(G1 + P1(G0))))
-      result.gn = g.get(0)
-          .and(p.get(1)).or(g.get(1))
-          .and(p.get(2)).or(g.get(2))
-          .and(p.get(3)).or(g.get(3))
-          .not();
-      // Cn+4 = C4
-      result.carryOut = c4;
-      // OVR = C4 ^ C3
-      result.overflow = c4.xor(c3);
-    }
-
-    /**
-     * Set the ALU flags for the logical-or microcode: "OR".
-     *
-     * @param result the ALU result.
-     * @param p      the "propagate" output from the ALU.
-     * @param g      the "generate" output from the ALU.
-     */
-    private void setOrFlags(AluResult result, Value p, Value g) {
-      final var c0 = getPort(C0); // Already validated
-
-      // Z = /(F3 + F2 + F1 + F0)
-      result.zero = result.f.get(3)
-          .or(result.f.get(2))
-          .or(result.f.get(1))
-          .or(result.f.get(0))
-          .not();
-      // Pn = 0
-      result.pn = Value.FALSE;
-      // Gn = P3P2P1P0
-      result.gn = p.get(3)
-          .and(p.get(2))
-          .and(p.get(1))
-          .and(p.get(0));
-      // Cn+4 = /(P3P2P1P0) + C0
-      //      = /Gn + C0
-      result.carryOut = result.gn.not().or(c0);
-      // OVR = /(P3P2P1P0) + C0
-      //     = Cn+4
-      result.overflow = result.carryOut;
-    }
-
-    /**
-     * Set the ALU flags for the logical-and microcode: "AND" and "NOTRS".
-     *
-     * @param result the ALU result.
-     * @param p      the "propagate" output from the ALU.
-     * @param g      the "generate" output from the ALU.
-     */
-    private void setAndFlags(AluResult result, Value p, Value g) {
-      final var c0 = getPort(C0); // Already validated
-
-      // Z = /(F3 + F2 + F1 + F0)
-      result.zero = result.f.get(3)
-          .or(result.f.get(2))
-          .or(result.f.get(1))
-          .or(result.f.get(0))
-          .not();
-      // Pn = 0
-      result.pn = Value.FALSE;
-      // Gn = /(G3 + G2 + G1 + G0)
-      result.gn = g.get(3)
-          .or(g.get(2))
-          .or(g.get(1))
-          .or(g.get(0))
-          .not();
-      // Cn+4 = G3 + G2 + G1 + G0 + C0
-      //      = /Gn + C0
-      result.carryOut = result.gn.not().or(c0);
-      // OVR = G3 + G2 + G1 + G0 + C0
-      //     = Cn+4
-      result.overflow = result.carryOut;
-    }
-
-    /**
-     * Set the ALU flags for the logical-xor microcodes: "EXOR" and "EXNOR".
-     *
-     * @param result the ALU result.
-     * @param p      the "propagate" output from the ALU.
-     * @param g      the "generate" output from the ALU.
-     */
-    private void setXorFlags(AluResult result, Value p, Value g) {
-      final var c0 = getPort(C0); // Already validated
-
-      // Z = /(F3 + F2 + F1 + F0)
-      result.zero = result.f.get(3)
-          .or(result.f.get(2))
-          .or(result.f.get(1))
-          .or(result.f.get(0))
-          .not();
-      // Pn = G3 + G2 + G1 + G0
-      result.pn = g.get(3)
-          .or(g.get(2))
-          .or(g.get(1))
-          .or(g.get(0));
-      // Gn = G3 + P3G2 + P3P2G1 + P3P2P1P0
-      //    = G3 + P3(G2 + P2(G1 + P1(P0)))
-      result.gn = p.get(0)
-          .and(p.get(1)).or(g.get(1))
-          .and(p.get(2)).or(g.get(2))
-          .and(p.get(3)).or(g.get(3));
-      // Cn+4 = G3 + P3G2 + P3P2G1 + P3P2P1P0(G0+/C0)
-      //      = G3 + P3(G2 + P2(G1 + P1(P0(G0+/C0))))
-      result.carryOut = c0.not().or(g.get(0)).and(p.get(0))
-          .and(p.get(1)).or(g.get(1))
-          .and(p.get(2)).or(g.get(2))
-          .and(p.get(3)).or(g.get(3));
-      // OVR uses inverted values for P and G
-      // OVR = (P2 + G2P1 + G2G1P0 + G2G1G0C0) ^ (P3 + G3P2 + G3G2P1 + G3G2G1P0 + G3G2G1G0C0)
-      // A   = (P2 + G2P1 + G2G1P0 + G2G1G0C0)
-      //       (P2 + G2(P1 + G1(P0 + G0(C0))))
-      // OVR = A ^ (P3 + G3A)
-      final var a = c0
-          .and(g.get(0).not()).or(p.get(0).not())
-          .and(g.get(1).not()).or(p.get(1).not())
-          .and(g.get(2).not()).or(p.get(2).not());
-      result.overflow = a.xor(a.and(g.get(3).not()).or(p.get(3).not()));
-    }
-
-    /**
-     * Get the R and S inputs to the ALU from the ALU mux inputs
-     *
-     * @return an immutable pair with "left" = R operand and "right" = S operand
-     */
-    private ImmutablePair<Value, Value> getAluOperands() {
-      // Get all possible non-constant data inputs for the ALU input muxes: A, B, D and Q
-      final var aSelect = getPort(A_INPUTS);
-      final var bSelect = getPort(B_INPUTS);
-
-      final var aData = getRegister(aSelect);
-      final var bData = getRegister(bSelect);
-      final var dData = getPort(D_INPUTS);
-      final var qData = getRegister(Q_REG_IX);
-
-      final var aluSource = getPort(ALU_SRC);
-
-      // Filter ALU source ERROR values
-      if (aluSource.isErrorValue()) {
-        return new ImmutablePair<>(ERROR_DATA, ERROR_DATA);
-      }
-
-      // Filter ALU source UNKNOWN values
-      if (!aluSource.isFullyDefined()) {
-        return new ImmutablePair<>(UNKNOWN_DATA, UNKNOWN_DATA);
-      }
-
-      var operands = new ImmutablePair<>(ERROR_DATA, ERROR_DATA);
-
-      // ALU source is fully defined now
-      if (aluSource == AQ) {
-        operands = new ImmutablePair<>(aData, qData);
-      } else if (aluSource == AB) {
-        operands = new ImmutablePair<>(aData, bData);
-      } else if (aluSource == ZQ) {
-        operands = new ImmutablePair<>(ZERO_DATA, qData);
-      } else if (aluSource == ZB) {
-        operands = new ImmutablePair<>(ZERO_DATA, bData);
-      } else if (aluSource == ZA) {
-        operands = new ImmutablePair<>(ZERO_DATA, aData);
-      } else if (aluSource == DA) {
-        operands = new ImmutablePair<>(dData, aData);
-      } else if (aluSource == DQ) {
-        operands = new ImmutablePair<>(dData, qData);
-      } else if (aluSource == DZ) {
-        operands = new ImmutablePair<>(dData, ZERO_DATA);
-      }
-
-      return operands;
-    }
-
-    /**
-     * Get the ALU result according to the ALU function microcode.
-     *
-     * @param operands the R and S ALU operands
-     * @return the ALU result
-     */
-    private AluResult getAluResult(ImmutablePair<Value, Value> operands) {
-      final var r = operands.getLeft();
-      final var s = operands.getRight();
-      final var c0 = getPort(C0);
-      final var aluFunction = getPort(ALU_FUNC);
-
-      // Filter R, S, C0 and ALU function ERROR values
-      if (r.isErrorValue() || s.isErrorValue() || c0.isErrorValue() || aluFunction.isErrorValue()) {
-        return AluResult.ERROR;
-      }
-
-      // Filter R, S, C0 and ALU function UNKNOWN values
-      if (!r.isFullyDefined() || !s.isFullyDefined() || !c0.isFullyDefined() || !aluFunction.isFullyDefined()) {
-        return AluResult.UNKNOWN;
-      }
-
-      var result = AluResult.UNKNOWN;
-
-      // Calculate F (the ALU result) and the result flags
-      if (aluFunction == ADD) {
-        result.f = Value.createKnown(REGISTER_WIDTH, r.toLongValue() + s.toLongValue() + c0.toLongValue());
-        setArithmeticFlags(result, r.or(s), r.and(s));
-      } else if (aluFunction == SUBR) {
-        result.f = Value.createKnown(REGISTER_WIDTH, s.toLongValue() - r.toLongValue() - c0.not().toLongValue());
-        setArithmeticFlags(result, r.not().or(s), r.not().and(s));
-      } else if (aluFunction == SUBS) {
-        result.f = Value.createKnown(REGISTER_WIDTH, r.toLongValue() - s.toLongValue() - c0.not().toLongValue());
-        setArithmeticFlags(result, r.or(s.not()), r.and(s.not()));
-      } else if (aluFunction == OR) {
-        result.f = r.or(s);
-        setOrFlags(result, r.or(s), r.and(s));
-      } else if (aluFunction == AND) {
-        result.f = r.and(s);
-        setAndFlags(result, r.or(s), r.and(s));
-      } else if (aluFunction == NOTRS) {
-        result.f = r.not().and(s);
-        setAndFlags(result, r.not().or(s), r.not().and(s));
-      } else if (aluFunction == EXOR) {
-        result.f = r.xor(s);
-        setXorFlags(result, r.not().or(s), r.not().and(s));
-      } else if (aluFunction == EXNOR) {
-        result.f = r.xor(s).not();
-        setXorFlags(result, r.not().or(s), r.not().and(s));
-      }
-
-      return result;
-    }
-
-    /**
-     * Process the clock inputs to the various registers.
-     * A and B latches are triggered when the clock is high.
-     * Q is triggered at the rising edge.
-     * The register file is triggered when the clock is low.
-     *
-     * @param f the ALU output.
-     */
-    private void propagateRegisters(Value f) {
-      final var a = getPort(A_INPUTS);
-      final var b = getPort(B_INPUTS);
-
-      // A latch
-      if (data.updateClock(getPort(CLK), A_REG_IX, StdAttr.TRIG_HIGH)) {
-        setRegister(A_REG_IX, getRegister(a));
-      }
-
-      // B latch
-      if (data.updateClock(getPort(CLK), B_REG_IX, StdAttr.TRIG_HIGH)) {
-        setRegister(B_REG_IX, getRegister(b));
-      }
-
-      final var aluDest = getPort(ALU_DEST);
-
-      // Filter ALU destination ERROR and UNKNOWN values
-      if (!aluDest.isFullyDefined()) {
-        return;
-      }
-
-      // Q register
-      if (data.updateClock(getPort(CLK), Q_REG_IX, StdAttr.TRIG_RISING)) {
-        if (aluDest == QREG) {
-          setRegister(Q_REG_IX, f);
-        } else if (aluDest == RAMQD) {
-          setRegister(Q_REG_IX, getRegister(Q_REG_IX).shr(getPort(Q3)));
-        } else if (aluDest == RAMQU) {
-          setRegister(Q_REG_IX, getRegister(Q_REG_IX).shl(getPort(Q0)));
-        }
-      }
-
-      // Register file
-      if (data.updateClock(getPort(CLK), (int) b.toLongValue(), StdAttr.TRIG_LOW)) {
-        if (aluDest == RAMA || aluDest == RAMF) {
-          setRegister(b, f);
-        } else if (aluDest == RAMQD || aluDest == RAMD) {
-          setRegister(b, f.shr(getPort(RAM3)));
-        } else if (aluDest == RAMQU || aluDest == RAMU) {
-          setRegister(b, f.shl(getPort(RAM0)));
-        }
-      }
-    }
-
-    /**
-     * Set the bidirectional lines to high-Z according
-     * to the ALU destination microcode.
-     */
-    private void propagateBufferControl() {
-      final var aluDest = getPort(ALU_DEST);
-
-      if (aluDest.isFullyDefined()) {
-        if (aluDest != RAMQD && aluDest != RAMD) {
-          setPort(Q0, Value.UNKNOWN);
-          setPort(RAM0, Value.UNKNOWN);
-        }
-
-        if (aluDest != RAMQU && aluDest != RAMU) {
-          setPort(Q3, Value.UNKNOWN);
-          setPort(RAM3, Value.UNKNOWN);
-        }
-      }
-    }
-
-    private void propagateTtlOutputs(AluResult aluResult) {
-      final var aluSrc = getPort(ALU_SRC);
-      final var aluFunc = getPort(ALU_FUNC);
-
-      if (aluSrc.isErrorValue() || aluFunc.isErrorValue()) {
-        setPort(TTL_OUTPUTS, Value.createError(BitWidth.create(TTL_OUTPUTS.length)));
-
-        return;
-      }
-
-      if (!aluSrc.isFullyDefined() || !aluFunc.isFullyDefined()) {
-        setPort(TTL_OUTPUTS, Value.createUnknown(BitWidth.create(TTL_OUTPUTS.length)));
-
-        return;
-      }
-
-      setPort(Pn, aluResult.pn);
-      setPort(Gn, aluResult.gn);
-      setPort(C4, aluResult.carryOut);
-      setPort(OVR, aluResult.overflow);
-      setPort(F3, aluResult.f.get(3));
-      setPort(ZERO, aluResult.zero);
-    }
-
-    private void propagateShiftOutputs(AluResult aluResult) {
-      final var aluDest = getPort(ALU_DEST);
-
-      if (aluDest.isErrorValue()) {
-        setPort(Q0, Value.ERROR);
-        setPort(RAM0, Value.ERROR);
-        setPort(Q3, Value.ERROR);
-        setPort(RAM3, Value.ERROR);
-
-        return;
-      }
-
-      if (!aluDest.isFullyDefined()) {
-        setPort(Q0, Value.UNKNOWN);
-        setPort(RAM0, Value.UNKNOWN);
-        setPort(Q3, Value.UNKNOWN);
-        setPort(RAM3, Value.UNKNOWN);
-
-        return;
-      }
-
-      if (aluDest == RAMQD || aluDest == RAMD) {
-        setPort(Q0, getRegister(Q_REG_IX).get(0));
-        setPort(RAM0, aluResult.f.get(0));
-      } else if (aluDest == RAMQU) {
-        setPort(Q0, Value.UNKNOWN);
-        setPort(RAM0, Value.UNKNOWN);
-      } else {
-        setPort(Q0, Value.UNKNOWN);
-      }
-
-
-
-
-
-      if (aluDest == RAMQD || aluDest == RAMD) {
-        setPort(Q0, getRegister(Q_REG_IX).get(0));
-        setPort(RAM0, aluResult.f.get(0));
-      } else if (aluDest == RAMQU) {
-        setPort(Q0, Value.UNKNOWN);
-        setPort(RAM0, Value.UNKNOWN);
-      } else {
-        setPort(Q0, Value.UNKNOWN);
-      }
-
-      if (aluDest == RAMQU || aluDest == RAMU) {
-        setPort(Q0, getRegister(Q_REG_IX).get(0));
-        setPort(RAM0, aluResult.f.get(0));
-      } else if (aluDest == RAMQD) {
-        setPort(Q0, Value.UNKNOWN);
-        setPort(RAM0, Value.UNKNOWN);
-      } else {
-        setPort(Q0, Value.UNKNOWN);
-      }
-    }
-
-    private void propagateYOutputs(AluResult aluResult) {
-      final var oen = getPort(OEn);
-      final var aluDest = getPort(ALU_DEST);
-
-      if (oen.isErrorValue() || aluDest.isErrorValue()) {
-        setPort(Y_OUTPUTS, ERROR_DATA);
-
-        return;
-      }
-
-      if (!oen.isFullyDefined() && !aluDest.isFullyDefined()) {
-        setPort(Y_OUTPUTS, UNKNOWN_DATA);
-
-        return;
-      }
-
-      if (oen == Value.TRUE) {
-        setPort(Y_OUTPUTS, UNKNOWN_DATA);
-      } else {
-        if (aluDest == RAMA) {
-          setPort(Y_OUTPUTS, getRegister(A_REG_IX));
-        } else {
-          setPort(Y_OUTPUTS, aluResult.f);
-        }
-      }
-    }
-
-    private void propagateOutputs(AluResult aluResult) {
-      propagateTtlOutputs(aluResult);
-      propagateShiftOutputs(aluResult);
-      propagateYOutputs(aluResult);
-    }
-
     public void propagate() {
       final var aluFunc = getPort(ALU_FUNC).toLongValue();
       final var aluSrc = getPort(ALU_SRC).toLongValue();
@@ -802,35 +342,35 @@ public class Am2901 extends AbstractTtlGate {
       Value rOp, sOp;
 
       switch ((int) aluSrc) {
-        case 0:
+        case AQ:
           rOp = aReg;
           sOp = qReg;
           break;
-        case 1:
+        case AB:
           rOp = aReg;
           sOp = bReg;
           break;
-        case 2:
+        case ZQ:
           rOp = ZERO_DATA;
           sOp = qReg;
           break;
-        case 3:
+        case ZB:
           rOp = ZERO_DATA;
           sOp = bReg;
           break;
-        case 4:
+        case ZA:
           rOp = ZERO_DATA;
           sOp = aReg;
           break;
-        case 5:
+        case DA:
           rOp = d;
           sOp = aReg;
           break;
-        case 6:
+        case DQ:
           rOp = d;
           sOp = qReg;
           break;
-        case 7:
+        case DZ:
           rOp = d;
           sOp = ZERO_DATA;
           break;
@@ -844,28 +384,28 @@ public class Am2901 extends AbstractTtlGate {
       Value f;
 
       switch ((int) aluFunc) {
-        case 0: // ADD
-          f = Value.createKnown(REGISTER_WIDTH, rOp.toLongValue() + sOp.toLongValue());
+        case ADD:
+          f = Value.createKnown(REGISTER_WIDTH, rOp.toLongValue() + sOp.toLongValue() + cIn.toLongValue());
           break;
-        case 1: // SUBR
+        case SUBR:
           f = Value.createKnown(REGISTER_WIDTH, sOp.toLongValue() - rOp.toLongValue());
           break;
-        case 2: // SUBS
+        case SUBS:
           f = Value.createKnown(REGISTER_WIDTH, rOp.toLongValue() - sOp.toLongValue());
           break;
-        case 3: // OR
+        case OR:
           f = Value.createKnown(REGISTER_WIDTH, rOp.toLongValue() | sOp.toLongValue());
           break;
-        case 4: // AND
+        case AND:
           f = Value.createKnown(REGISTER_WIDTH, rOp.toLongValue() & sOp.toLongValue());
           break;
-        case 5: // NOTRS
+        case NOTRS:
           f = Value.createKnown(REGISTER_WIDTH, ~rOp.toLongValue() & sOp.toLongValue());
           break;
-        case 6: // EXOR
+        case EXOR:
           f = Value.createKnown(REGISTER_WIDTH, rOp.toLongValue() ^ sOp.toLongValue());
           break;
-        case 7: // EXNOR
+        case EXNOR:
           f = Value.createKnown(REGISTER_WIDTH, ~(rOp.toLongValue() ^ sOp.toLongValue()));
           break;
         default:
@@ -884,8 +424,8 @@ public class Am2901 extends AbstractTtlGate {
       Value q0En;   // Q0 output enable
       Value q3En;   // Q3 output enable
 
-      switch((int) aluDest) {
-        case 0: // QREG
+      switch ((int) aluDest) {
+        case QREG:
           rfIn = ERROR_DATA;
           qrIn = f;
           y = f;
@@ -896,7 +436,7 @@ public class Am2901 extends AbstractTtlGate {
           q0En = Value.FALSE;
           q3En = Value.FALSE;
           break;
-        case 1: // NOP
+        case NOP:
           rfIn = ERROR_DATA;
           qrIn = ERROR_DATA;
           y = f;
@@ -907,7 +447,7 @@ public class Am2901 extends AbstractTtlGate {
           q0En = Value.FALSE;
           q3En = Value.FALSE;
           break;
-        case 2: // RAMA
+        case RAMA:
           rfIn = f;
           qrIn = ERROR_DATA;
           y = aReg;
@@ -918,7 +458,7 @@ public class Am2901 extends AbstractTtlGate {
           q0En = Value.FALSE;
           q3En = Value.FALSE;
           break;
-        case 3: // RAMF
+        case RAMF:
           rfIn = f;
           qrIn = ERROR_DATA;
           y = f;
@@ -929,7 +469,7 @@ public class Am2901 extends AbstractTtlGate {
           q0En = Value.FALSE;
           q3En = Value.FALSE;
           break;
-        case 4: // RAMQD
+        case RAMQD:
           rfIn = f.shr(ram3);
           qrIn = qReg.shr(q3);
           y = f;
@@ -940,7 +480,7 @@ public class Am2901 extends AbstractTtlGate {
           q0En = Value.TRUE;
           q3En = Value.TRUE;
           break;
-        case 5: // RAMD
+        case RAMD:
           rfIn = f.shr(ram3);
           qrIn = ERROR_DATA;
           y = f;
@@ -951,7 +491,7 @@ public class Am2901 extends AbstractTtlGate {
           q0En = Value.TRUE;
           q3En = Value.FALSE;
           break;
-        case 6: // RAMQU
+        case RAMQU:
           rfIn = f.shl(ram0);
           qrIn = qReg.shl(q0);
           y = f;
@@ -962,7 +502,7 @@ public class Am2901 extends AbstractTtlGate {
           q0En = Value.TRUE;
           q3En = Value.TRUE;
           break;
-        case 7: // RAMU
+        case RAMU:
           rfIn = f.shl(ram0);
           qrIn = ERROR_DATA;
           y = f;
@@ -987,12 +527,13 @@ public class Am2901 extends AbstractTtlGate {
       }
 
       // { Pn, Gn, C4, OVR, F3, ZERO, Y0, Y1, Y2, Y3, RAM0, RAM3, Q0, Q3 }
-      // { Pn, Gn, C4, OVR, F3, ZERO,                                    }
+      // { Pn, Gn, C4, OVR,                                              }
 
-      if (oen == Value.FALSE) {
-        setPort(Y_OUTPUTS, y);
-      } else if (oen == Value.TRUE) {
+      // Combinatorial outputs
+      if (oen == Value.TRUE) {
         setPort(Y_OUTPUTS, UNKNOWN_DATA);
+      } else if (oen == Value.FALSE) {
+        setPort(Y_OUTPUTS, y);
       } else {
         setPort(Y_OUTPUTS, ERROR_DATA);
       }
@@ -1020,6 +561,18 @@ public class Am2901 extends AbstractTtlGate {
       } else {
         setPort(RAM3, Value.UNKNOWN);
       }
+
+      // F3
+      setPort(F3, f.get(3));
+
+      // F=0
+      var fEqZero = f.get(3)
+          .or(f.get(2))
+          .or(f.get(1))
+          .or(f.get(0))
+          .not();
+
+      setPort(ZERO, fEqZero);
 
       // A latch
       if (data.updateClock(clk, A_REG_IX, StdAttr.TRIG_HIGH)) {
