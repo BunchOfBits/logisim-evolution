@@ -7,7 +7,7 @@
  * This is free software released under GNU GPLv3 license
  */
 
-package com.cburch.logisim.std.classic;
+package com.cburch.logisim.std.msi;
 
 import com.cburch.logisim.data.Attribute;
 import com.cburch.logisim.data.Attributes;
@@ -19,14 +19,14 @@ import java.util.List;
 
 import static com.cburch.logisim.std.Strings.S;
 
-public class ClassicLibrary extends Library {
+public class MsiLibrary extends Library {
   /**
    * Unique identifier of the library, used as reference in project files. Do NOT change as it will
    * prevent project files from loading.
    *
    * <p>Identifier value MUST be unique string among all libraries.
    */
-  public static final String _ID = "Classic";
+  public static final String _ID = "MSI";
 
   private static final FactoryDescription[] DESCRIPTIONS = {
       new FactoryDescription(Am2901.class, S.getter("Am2901"), "ttl.gif"),
@@ -39,13 +39,13 @@ public class ClassicLibrary extends Library {
 
   @Override
   public String getDisplayName() {
-    return S.get("classicLibrary");
+    return S.get("msiLibrary");
   }
 
   @Override
   public List<? extends Tool> getTools() {
     if (tools == null) {
-      tools = FactoryDescription.getTools(ClassicLibrary.class, DESCRIPTIONS);
+      tools = FactoryDescription.getTools(MsiLibrary.class, DESCRIPTIONS);
     }
     return tools;
   }
