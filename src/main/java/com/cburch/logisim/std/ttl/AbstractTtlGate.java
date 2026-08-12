@@ -97,14 +97,12 @@ public abstract class AbstractTtlGate extends InstanceFactory {
       byte[] gndPins,
       HdlGeneratorFactory generator) {
     super(name, generator);
-    for(byte vccPin : vccPins)
-    {
+    for (byte vccPin : vccPins) {
       if (vccPin < 1 || vccPin > pins) {
         throw new IllegalArgumentException("Invalid TTL power pin mapping");
       }
 
-      for(byte gndPin : gndPins)
-      {
+      for (byte gndPin : gndPins) {
         if (gndPin < 1 || gndPin > pins || vccPin == gndPin) {
           throw new IllegalArgumentException("Invalid TTL power pin mapping");
         }
