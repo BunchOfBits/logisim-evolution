@@ -339,7 +339,8 @@ public class Am2901 extends AbstractTtlGate {
       final var qReg = getRegister(Q_REG_IX);
 
       // ALU source decode
-      Value rOp, sOp;
+      var rOp = ERROR_DATA;
+      var sOp = ERROR_DATA;
 
       switch ((int) aluSrc) {
         case AQ:
@@ -374,24 +375,20 @@ public class Am2901 extends AbstractTtlGate {
           rOp = d;
           sOp = ZERO_DATA;
           break;
-        default:
-          rOp = ERROR_DATA;
-          sOp = ERROR_DATA;
-          break;
       }
 
       // ALU function decode
-      Value f;
+      var f = ERROR_DATA;
 
       switch ((int) aluFunc) {
         case ADD:
           f = Value.createKnown(REGISTER_WIDTH, rOp.toLongValue() + sOp.toLongValue() + cIn.toLongValue());
           break;
         case SUBR:
-          f = Value.createKnown(REGISTER_WIDTH, sOp.toLongValue() - rOp.toLongValue());
+          f = Value.createKnown(REGISTER_WIDTH, sOp.toLongValue() - rOp.toLongValue() - cIn.not().toLongValue());
           break;
         case SUBS:
-          f = Value.createKnown(REGISTER_WIDTH, rOp.toLongValue() - sOp.toLongValue());
+          f = Value.createKnown(REGISTER_WIDTH, rOp.toLongValue() - sOp.toLongValue() - cIn.not().toLongValue());
           break;
         case OR:
           f = Value.createKnown(REGISTER_WIDTH, rOp.toLongValue() | sOp.toLongValue());
@@ -408,21 +405,129 @@ public class Am2901 extends AbstractTtlGate {
         case EXNOR:
           f = Value.createKnown(REGISTER_WIDTH, ~(rOp.toLongValue() ^ sOp.toLongValue()));
           break;
-        default:
-          f = ERROR_DATA;
+      }
+
+      // CLA function decode
+      var p0 = Value.ERROR;
+      var p1 = Value.ERROR;
+      var p2 = Value.ERROR;
+      var p3 = Value.ERROR;
+      var g0 = Value.ERROR;
+      var g1 = Value.ERROR;
+      var g2 = Value.ERROR;
+      var g3 = Value.ERROR;
+
+      switch ((int) aluFunc) {
+        case ADD:
+        case OR:
+        case AND:
+        case EXNOR:
+          p0 = rOp.get(0).or(sOp.get(0));
+          p1 = rOp.get(1).or(sOp.get(1));
+          p2 = rOp.get(2).or(sOp.get(2));
+          p3 = rOp.get(3).or(sOp.get(3));
+          g0 = rOp.get(0).and(sOp.get(0));
+          g1 = rOp.get(1).and(sOp.get(1));
+          g2 = rOp.get(2).and(sOp.get(2));
+          g3 = rOp.get(3).and(sOp.get(3));
+          break;
+        case SUBR:
+        case NOTRS:
+        case EXOR:
+          p0 = rOp.get(0).not().or(sOp.get(0));
+          p1 = rOp.get(1).not().or(sOp.get(1));
+          p2 = rOp.get(2).not().or(sOp.get(2));
+          p3 = rOp.get(3).not().or(sOp.get(3));
+          g0 = rOp.get(0).not().and(sOp.get(0));
+          g1 = rOp.get(1).not().and(sOp.get(1));
+          g2 = rOp.get(2).not().and(sOp.get(2));
+          g3 = rOp.get(3).not().and(sOp.get(3));
+          break;
+        case SUBS:
+          p0 = rOp.get(0).or(sOp.get(0).not());
+          p1 = rOp.get(1).or(sOp.get(1).not());
+          p2 = rOp.get(2).or(sOp.get(2).not());
+          p3 = rOp.get(3).or(sOp.get(3).not());
+          g0 = rOp.get(0).and(sOp.get(0).not());
+          g1 = rOp.get(1).and(sOp.get(1).not());
+          g2 = rOp.get(2).and(sOp.get(2).not());
+          g3 = rOp.get(3).and(sOp.get(3).not());
+          break;
+      }
+
+      final var c3 = g2
+          .or(p2.and(g1))
+          .or(p2.and(p1).and(g0))
+          .or(p2.and(p1).and(p0).and(cIn));
+      final var c4 = g3.or(p3.and(c3));
+
+      // ALU status bits decode
+      var pn = Value.ERROR;
+      var gn = Value.ERROR;
+      var cn4 = Value.ERROR;
+      var ovr = Value.ERROR;
+
+      switch ((int) aluFunc) {
+        case ADD:
+        case SUBR:
+        case SUBS:
+          pn = p3.and(p2).and(p1).and(p0).not();
+          gn = g3
+              .or(p3.and(g2))
+              .or(p3.and(p2).and(g1))
+              .or(p3.and(p2).and(p1).and(g0))
+              .not();
+          cn4 = c4;
+          ovr = c3.xor(c4).not();
+          break;
+        case OR:
+          pn = Value.FALSE;
+          gn = p3.and(p2).and(p1).and(p0);
+          cn4 = gn.not().or(cIn);
+          ovr = cn4;
+          break;
+        case AND:
+        case NOTRS:
+          pn = Value.FALSE;
+          gn = g3.or(g2).or(g1).or(g0).not();
+          cn4 = gn.not().or(cIn);
+          ovr = cn4;
+          break;
+        case EXOR:
+        case EXNOR:
+          pn = g3.or(g2).or(g1).or(g0);
+          gn = g3
+              .or(p3.and(g2))
+              .or(p3.and(p2).and(g1))
+              .or(p3.and(p2).and(p1).and(p0));
+          cn4 = g3
+              .or(p3.and(g2))
+              .or(p3.and(p2).and(g1))
+              .or(p3.and(p2).and(p1).and(p0).and(g0.or(cIn)))
+              .not();
+          ovr = p2.not()
+              .or(g2.not().and(p1.not()))
+              .or(g2.not().and(g1.not()).and(p0.not()))
+              .or(g2.not().and(g1.not()).and(g0.not()).and(cIn))
+              .xor(p3.not()
+                  .or(g3.not().and(p2.not()))
+                  .or(g3.not().and(g2.not()).and(p1.not()))
+                  .or(g3.not().and(g2.not()).and(g1.not()).and(p0.not()))
+                  .or(g3.not().and(g2.not()).and(g1.not()).and(g0.not()).and(cIn)))
+              .not();
           break;
       }
 
       // ALU destination decode
-      Value rfIn; // Register file input data
-      Value qrIn; // Q register input data
-      Value y;    // Y output data
-      Value qrEn; // Q register enable
-      Value rfEn; // Register file write enable
-      Value ram0En; // RAM0 output enable
-      Value ram3En; // RAM3 output enable
-      Value q0En;   // Q0 output enable
-      Value q3En;   // Q3 output enable
+      var rfIn = ERROR_DATA;    // Register file input data
+      var qrIn = ERROR_DATA;    // Q register input data
+      var y = ERROR_DATA;       // Y output data
+      var qrEn = Value.FALSE;   // Q register enable
+      var rfEn = Value.FALSE;   // Register file write enable
+      var ram0En = Value.FALSE; // RAM0 output enable
+      var ram3En = Value.FALSE; // RAM3 output enable
+      var q0En = Value.FALSE;   // Q0 output enable
+      var q3En = Value.FALSE;   // Q3 output enable
 
       switch ((int) aluDest) {
         case QREG:
@@ -513,23 +618,9 @@ public class Am2901 extends AbstractTtlGate {
           q0En = Value.FALSE;
           q3En = Value.TRUE;
           break;
-        default:
-          rfIn = ERROR_DATA;
-          qrIn = ERROR_DATA;
-          y = ERROR_DATA;
-          qrEn = Value.FALSE;
-          rfEn = Value.FALSE;
-          ram0En = Value.FALSE;
-          ram3En = Value.FALSE;
-          q0En = Value.FALSE;
-          q3En = Value.FALSE;
-          break;
       }
 
-      // { Pn, Gn, C4, OVR, F3, ZERO, Y0, Y1, Y2, Y3, RAM0, RAM3, Q0, Q3 }
-      // { Pn, Gn, C4, OVR,                                              }
-
-      // Combinatorial outputs
+      // ALU output
       if (oen == Value.TRUE) {
         setPort(Y_OUTPUTS, UNKNOWN_DATA);
       } else if (oen == Value.FALSE) {
@@ -538,6 +629,19 @@ public class Am2901 extends AbstractTtlGate {
         setPort(Y_OUTPUTS, ERROR_DATA);
       }
 
+      // ALU status flags
+      var fEqZero = f.get(3)
+          .or(f.get(2))
+          .or(f.get(1))
+          .or(f.get(0))
+          .not();
+
+      setPort(ZERO, fEqZero);
+      setPort(F3, f.get(3));
+      setPort(C4, cn4);
+      setPort(OVR, ovr);
+
+      // Shift register outputs
       if (q0En == Value.TRUE) {
         setPort(Q0, qReg.get(0));
       } else {
@@ -562,17 +666,11 @@ public class Am2901 extends AbstractTtlGate {
         setPort(RAM3, Value.UNKNOWN);
       }
 
-      // F3
-      setPort(F3, f.get(3));
+      // Pn
+      setPort(Pn, pn);
 
-      // F=0
-      var fEqZero = f.get(3)
-          .or(f.get(2))
-          .or(f.get(1))
-          .or(f.get(0))
-          .not();
-
-      setPort(ZERO, fEqZero);
+      // Gn
+      setPort(Gn, gn);
 
       // A latch
       if (data.updateClock(clk, A_REG_IX, StdAttr.TRIG_HIGH)) {
@@ -590,7 +688,7 @@ public class Am2901 extends AbstractTtlGate {
       }
 
       // Register file
-      if (data.updateClock(clk, (int) b.toLongValue(), StdAttr.TRIG_LOW) && rfEn == Value.TRUE) {
+      if (b.isFullyDefined() && data.updateClock(clk, (int)b.toLongValue(), StdAttr.TRIG_LOW) && rfEn == Value.TRUE) {
         setRegister(b, rfIn);
       }
     }
