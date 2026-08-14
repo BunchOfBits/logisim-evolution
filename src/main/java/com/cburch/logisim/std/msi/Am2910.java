@@ -13,6 +13,7 @@ import com.cburch.logisim.data.BitWidth;
 import com.cburch.logisim.data.Value;
 import com.cburch.logisim.instance.InstancePainter;
 import com.cburch.logisim.instance.InstanceState;
+import com.cburch.logisim.instance.StdAttr;
 import com.cburch.logisim.std.ttl.AbstractTtlGate;
 import com.cburch.logisim.std.ttl.TtlRegisterData;
 
@@ -109,6 +110,24 @@ public class Am2910 extends AbstractTtlGate {
   private static final int μPC_REG_IX = 6;
   private static final int R_REG_IX = 7;
 
+  // Microcodes (see datasheet for names and meaning)
+  private static final int JZ = 0;
+  private static final int CJS = 1;
+  private static final int JMAP = 2;
+  private static final int CJP = 3;
+  private static final int PUSH = 4;
+  private static final int JSRP = 5;
+  private static final int CJV = 6;
+  private static final int JRP = 7;
+  private static final int RFCT = 8;
+  private static final int RPCT = 9;
+  private static final int CRTN = 10;
+  private static final int CJPP = 11;
+  private static final int LDCT = 12;
+  private static final int LOOP = 13;
+  private static final int CONT = 14;
+  private static final int TWB = 15;
+
   public Am2910() {
     super(
         _ID,
@@ -135,6 +154,30 @@ public class Am2910 extends AbstractTtlGate {
   }
 
   private record LogicScope(InstanceState state, TtlRegisterData data) {
+    enum RFunc {
+      ERROR,
+      DEC,
+      HOLD,
+      LOAD
+    }
+
+    enum MuxFunc {
+      ERROR,
+      CLEAR,
+      D,
+      R,
+      TOS,
+      μPC
+    }
+
+    enum StackFunc {
+      ERROR,
+      PUSH,
+      POP,
+      HOLD,
+      CLEAR
+    }
+
     LogicScope(InstanceState state) {
       this(state, getData(state));
     }
@@ -283,6 +326,302 @@ public class Am2910 extends AbstractTtlGate {
     }
 
     public void propagate() {
+      // Sample inputs
+      final var d = getPort(D_INPUTS);
+      final var i = getPort(I_INPUTS).toLongValue();
+
+      final var rldn = getPort(RLDn);
+
+      final var ccn = getPort(CCn);
+      final var ccenn = getPort(CCENn);
+
+      final var oen = getPort(OEn);
+      final var ci = getPort(CI);
+
+      final var clk = getPort(CLK);
+
+      // Sample registers
+      final var rReg = getRegister(R_REG_IX);
+      final var sp = (int) getRegister(SP_REG_IX).toLongValue();
+      final var tos = getRegister(sp);
+      final var μPc = getRegister(μPC_REG_IX);
+
+      // Instruction PLA
+      var rfunc = RFunc.ERROR;
+      var muxFunc = MuxFunc.ERROR;
+      var stackFunc = StackFunc.ERROR;
+      var pln = Value.ERROR;
+      var mapn = Value.ERROR;
+      var vectn = Value.ERROR;
+
+      final var zero = rReg.toLongValue() == 0;
+      final var pass = ccenn.or(ccn.not()) == Value.TRUE;
+      final var fail = ccenn.not().and(ccn) == Value.TRUE;
+
+      switch ((int) i) {
+        case JZ:
+          rfunc = RFunc.HOLD;
+          muxFunc = MuxFunc.CLEAR;
+          stackFunc = StackFunc.CLEAR;
+          pln = Value.FALSE;
+          mapn = Value.TRUE;
+          vectn = Value.TRUE;
+          break;
+        case CJS:
+          rfunc = RFunc.HOLD;
+          if (pass) {
+            muxFunc = MuxFunc.D;
+            stackFunc = StackFunc.PUSH;
+          } else if (fail) {
+            muxFunc = MuxFunc.μPC;
+            stackFunc = StackFunc.HOLD;
+          }
+          pln = Value.FALSE;
+          mapn = Value.TRUE;
+          vectn = Value.TRUE;
+          break;
+        case JMAP:
+          rfunc = RFunc.HOLD;
+          muxFunc = MuxFunc.D;
+          stackFunc = StackFunc.HOLD;
+          pln = Value.TRUE;
+          mapn = Value.FALSE;
+          vectn = Value.TRUE;
+          break;
+        case CJP:
+          rfunc = RFunc.HOLD;
+          if (pass) {
+            muxFunc = MuxFunc.D;
+          } else if (fail) {
+            muxFunc = MuxFunc.μPC;
+          }
+          stackFunc = StackFunc.HOLD;
+          pln = Value.FALSE;
+          mapn = Value.TRUE;
+          vectn = Value.TRUE;
+          break;
+        case PUSH:
+          if (pass) {
+            rfunc = RFunc.LOAD;
+          } else if (fail) {
+            rfunc = RFunc.HOLD;
+          }
+          muxFunc = MuxFunc.μPC;
+          stackFunc = StackFunc.PUSH;
+          pln = Value.FALSE;
+          mapn = Value.TRUE;
+          vectn = Value.TRUE;
+          break;
+        case JSRP:
+          rfunc = RFunc.HOLD;
+          if (pass) {
+            muxFunc = MuxFunc.D;
+          } else if (fail) {
+            muxFunc = MuxFunc.R;
+          }
+          stackFunc = StackFunc.PUSH;
+          pln = Value.FALSE;
+          mapn = Value.TRUE;
+          vectn = Value.TRUE;
+          break;
+        case CJV:
+          rfunc = RFunc.HOLD;
+          if (pass) {
+            muxFunc = MuxFunc.D;
+          } else if (fail) {
+            muxFunc = MuxFunc.μPC;
+          }
+          stackFunc = StackFunc.HOLD;
+          pln = Value.TRUE;
+          mapn = Value.TRUE;
+          vectn = Value.FALSE;
+          break;
+        case JRP:
+          rfunc = RFunc.HOLD;
+          if (pass) {
+            muxFunc = MuxFunc.D;
+          } else if (fail) {
+            muxFunc = MuxFunc.R;
+          }
+          stackFunc = StackFunc.HOLD;
+          pln = Value.FALSE;
+          mapn = Value.TRUE;
+          vectn = Value.TRUE;
+          break;
+        case RFCT:
+          if (zero) {
+            rfunc = RFunc.HOLD;
+            muxFunc = MuxFunc.μPC;
+            stackFunc = StackFunc.POP;
+          } else {
+            rfunc = RFunc.DEC;
+            muxFunc = MuxFunc.TOS;
+            stackFunc = StackFunc.HOLD;
+          }
+          pln = Value.FALSE;
+          mapn = Value.TRUE;
+          vectn = Value.TRUE;
+          break;
+        case RPCT:
+          if (zero) {
+            rfunc = RFunc.HOLD;
+            muxFunc = MuxFunc.μPC;
+          } else {
+            rfunc = RFunc.DEC;
+            muxFunc = MuxFunc.D;
+          }
+          stackFunc = StackFunc.HOLD;
+          pln = Value.FALSE;
+          mapn = Value.TRUE;
+          vectn = Value.TRUE;
+          break;
+        case CRTN:
+          rfunc = RFunc.HOLD;
+          if (pass) {
+            muxFunc = MuxFunc.TOS;
+            stackFunc = StackFunc.POP;
+          } else if (fail) {
+            muxFunc = MuxFunc.μPC;
+            stackFunc = StackFunc.HOLD;
+          }
+          pln = Value.FALSE;
+          mapn = Value.TRUE;
+          vectn = Value.TRUE;
+          break;
+        case CJPP:
+          rfunc = RFunc.HOLD;
+          if (pass) {
+            muxFunc = MuxFunc.D;
+            stackFunc = StackFunc.POP;
+          } else if (fail) {
+            muxFunc = MuxFunc.μPC;
+            stackFunc = StackFunc.HOLD;
+          }
+          pln = Value.FALSE;
+          mapn = Value.TRUE;
+          vectn = Value.TRUE;
+          break;
+        case LDCT:
+          rfunc = RFunc.HOLD;
+          muxFunc = MuxFunc.μPC;
+          stackFunc = StackFunc.HOLD;
+          pln = Value.FALSE;
+          mapn = Value.TRUE;
+          vectn = Value.TRUE;
+          break;
+        case LOOP:
+          rfunc = RFunc.HOLD;
+          if (pass) {
+            muxFunc = MuxFunc.μPC;
+            stackFunc = StackFunc.POP;
+          } else if (fail) {
+            muxFunc = MuxFunc.TOS;
+            stackFunc = StackFunc.HOLD;
+          }
+          pln = Value.FALSE;
+          mapn = Value.TRUE;
+          vectn = Value.TRUE;
+          break;
+        case CONT:
+          rfunc = RFunc.HOLD;
+          muxFunc = MuxFunc.μPC;
+          stackFunc = StackFunc.HOLD;
+          pln = Value.FALSE;
+          mapn = Value.TRUE;
+          vectn = Value.TRUE;
+          break;
+        case TWB:
+          if (zero) {
+            rfunc = RFunc.HOLD;
+          } else {
+            rfunc = RFunc.DEC;
+          }
+          if (pass) {
+            muxFunc = MuxFunc.μPC;
+            stackFunc = StackFunc.POP;
+          } else if (fail) {
+            if (zero) {
+              muxFunc = MuxFunc.D;
+              stackFunc = StackFunc.POP;
+            } else {
+              muxFunc = MuxFunc.TOS;
+              stackFunc = StackFunc.HOLD;
+            }
+          }
+          pln = Value.FALSE;
+          mapn = Value.TRUE;
+          vectn = Value.TRUE;
+          break;
+      }
+
+      // Mux
+      var mux = ERROR_ADDRESS;
+
+      switch (muxFunc) {
+        case CLEAR:
+          mux = ZERO_ADDRESS;
+          break;
+        case D:
+          mux = d;
+          break;
+        case R:
+          mux = rReg;
+          break;
+        case TOS:
+          mux = tos;
+          break;
+        case μPC:
+          mux = μPc;
+          break;
+      }
+
+      if (oen == Value.TRUE) {
+        setPort(Y_OUTPUTS, UNKNOWN_ADDRESS);
+      } else if (oen == Value.FALSE) {
+        setPort(Y_OUTPUTS, mux);
+      } else {
+        setPort(Y_OUTPUTS, ERROR_ADDRESS);
+      }
+
+      // PLn, MAPn and VECTn
+      setPort(PLn, pln);
+      setPort(MAPn, mapn);
+      setPort(VECTn, vectn);
+
+      // R register
+      if (data.updateClock(clk, R_REG_IX, StdAttr.TRIG_RISING)) {
+        if (rldn == Value.FALSE || rfunc == RFunc.LOAD) {
+          setRegister(R_REG_IX, d);
+        } else if (rfunc == RFunc.DEC) {
+          setRegister(R_REG_IX, Value.createKnown(ADDRESS_WIDTH, rReg.toLongValue() - 1));
+        }
+      }
+
+      // Stack
+      setPort(FULLn, sp == 4 ? Value.FALSE : Value.TRUE);
+
+      if (data.updateClock(clk, SP_REG_IX, StdAttr.TRIG_RISING)) {
+        switch (stackFunc) {
+          case PUSH:
+            setRegister(sp, μPc);
+
+            if (sp < 4) {
+              setRegister(SP_REG_IX,  Value.createKnown(ADDRESS_WIDTH,sp + 1));
+            }
+            break;
+          case POP:
+            if (sp > 0) {
+              setRegister(SP_REG_IX,  Value.createKnown(ADDRESS_WIDTH,sp - 1));
+            }
+            break;
+          case CLEAR:
+            setRegister(SP_REG_IX,  ZERO_ADDRESS);
+            break;
+        }
+      }
+
+      // μPc
+      setRegister(μPC_REG_IX, Value.createKnown(ADDRESS_WIDTH, mux.toLongValue() + ci.toLongValue()));
     }
   }
 
