@@ -30,6 +30,7 @@ public class MsiLibrary extends Library {
 
   private static final FactoryDescription[] DESCRIPTIONS = {
       new FactoryDescription(Am2901.class, S.getter("Am2901"), "ttl.gif"),
+      new FactoryDescription(Am2910.class, S.getter("Am2910"), "ttl.gif"),
   };
 
   static final Attribute<Boolean> VCC_GND =
