@@ -1003,6 +1003,10 @@ public class DualRamAppearance {
       drawAddress(g, loc.getX(), loc.getY(), attrs.getValue(Mem.ADDR_ATTR).getWidth(), i);
     }
 
+    /* control labels use a smaller font, centered on the port row, so they fit the 10px port pitch */
+    final var labelFont = g.getFont();
+    g.setFont(labelFont.deriveFont(9.0f));
+
     var cidx = 1;
     /* draw clock port text */
     for (var i = 0; i < getNrClkPorts(attrs); i++) {
@@ -1010,7 +1014,7 @@ public class DualRamAppearance {
       final var loc = inst.getPortLocation(idx);
       final var label = synchronous(attrs) ? "C" + cidx : "E" + cidx;
       cidx++;
-      g.drawString(label, loc.getX() + 33, loc.getY() + 5);
+      GraphicsUtil.drawText(g, label, loc.getX() + 33, loc.getY(), GraphicsUtil.H_LEFT, GraphicsUtil.V_CENTER);
     }
 
     /* draw output enable text */
@@ -1019,7 +1023,7 @@ public class DualRamAppearance {
       final var loc = inst.getPortLocation(idx);
       final var label = "M" + cidx + " [Output enable]";
       cidx++;
-      g.drawString(label, loc.getX() + 33, loc.getY() + 5);
+      GraphicsUtil.drawText(g, label, loc.getX() + 33, loc.getY(), GraphicsUtil.H_LEFT, GraphicsUtil.V_CENTER);
     }
 
     /* draw write enable text */
@@ -1028,7 +1032,7 @@ public class DualRamAppearance {
       final var loc = inst.getPortLocation(idx);
       final var label = "M" + cidx + " [Write enable]";
       cidx++;
-      g.drawString(label, loc.getX() + 33, loc.getY() + 5);
+      GraphicsUtil.drawText(g, label, loc.getX() + 33, loc.getY(), GraphicsUtil.H_LEFT, GraphicsUtil.V_CENTER);
     }
 
     /* draw line enable text */
@@ -1037,7 +1041,7 @@ public class DualRamAppearance {
       final var loc = inst.getPortLocation(idx);
       final var label = "M" + cidx + " [Line enable " + i + "]";
       cidx++;
-      g.drawString(label, loc.getX() + 33, loc.getY() + 5);
+      GraphicsUtil.drawText(g, label, loc.getX() + 33, loc.getY(), GraphicsUtil.H_LEFT, GraphicsUtil.V_CENTER);
     }
 
     /* draw byte enable text */
@@ -1046,8 +1050,9 @@ public class DualRamAppearance {
       final var loc = inst.getPortLocation(idx);
       final var label = "M" + cidx + " [Byte enable " + i + "]";
       cidx++;
-      g.drawString(label, loc.getX() + 33, loc.getY() + 5);
+      GraphicsUtil.drawText(g, label, loc.getX() + 33, loc.getY(), GraphicsUtil.H_LEFT, GraphicsUtil.V_CENTER);
     }
+    g.setFont(labelFont);
     g.dispose();
   }
 
