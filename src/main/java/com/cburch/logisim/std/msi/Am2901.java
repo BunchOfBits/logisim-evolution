@@ -313,6 +313,45 @@ public class Am2901 extends AbstractTtlGate {
       return data;
     }
 
+    private record State(Value rf, Value qr, Value ar, Value br) {
+    }
+
+    private record Outputs(Value p_n, Value g_n, Value c4, Value ovr, Value f3, Value zero, Value y, Value ram0, Value ram3, Value q0, Value q3) {
+    }
+
+    private record Combinatorial(State next, Outputs outputs) {
+      public Combinatorial() {
+        final var aluFunc = getPort(ALU_FUNC).toLongValue();
+        final var aluSrc = getPort(ALU_SRC).toLongValue();
+        final var aluDest = getPort(ALU_DEST).toLongValue();
+
+        final var a = getPort(A_INPUTS);
+        final var b = getPort(B_INPUTS);
+        final var d = getPort(D_INPUTS);
+
+        final var q0 = getPort(Q0);
+        final var q3 = getPort(Q3);
+
+        final var ram0 = getPort(RAM0);
+        final var ram3 = getPort(RAM3);
+
+        final var cIn = getPort(C0);
+
+        final var oen = getPort(OEn);
+
+        final var clk = getPort(CLK);
+      }
+    }
+
+    private void setup() {
+    }
+
+    private void tick() {
+    }
+
+    private void foo() {
+    }
+
     public void propagate() {
       final var aluFunc = getPort(ALU_FUNC).toLongValue();
       final var aluSrc = getPort(ALU_SRC).toLongValue();
